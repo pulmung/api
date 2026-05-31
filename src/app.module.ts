@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { validateEnv } from './config/env.validation';
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { DrizzleModule } from './database/drizzle.module';
@@ -7,6 +8,7 @@ import { DrizzleModule } from './database/drizzle.module';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      validate: validateEnv,
     }),
     DrizzleModule,
   ],

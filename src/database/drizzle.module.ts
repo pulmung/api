@@ -1,20 +1,20 @@
 import { Global, Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ConfigService } from '@nestjs/config';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import { DRIZZLE } from './drizzle.constants';
 import * as schema from './schema';
+import { Env } from '../config/env.validation';
 
 @Global()
 @Module({
-  imports: [ConfigModule],
   providers: [
     {
       provide: DRIZZLE,
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => {
+      useFactory: (configService: ConfigService<Env, true>) => {
         const pool = new Pool({
-          connectionString: configService.getOrThrow<string>('DATABASE_URL'),
+          connectionString: configService.get('DATABASE_URL', { infer: true }),
         });
         return drizzle(pool, { schema, casing: 'snake_case' });
       },
