@@ -16,13 +16,15 @@
   },
   "dependencies": {
     "@nestjs/common": "^11.1.24",
+    "@nestjs/config": "^4.0.4",
     "@nestjs/core": "^11.1.24",
     "@nestjs/platform-express": "^11.1.24",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
     "pg": "^8.21.0",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.2"
+    "rxjs": "^7.8.2",
+    "uuidv7": "^1.2.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.18.0",
