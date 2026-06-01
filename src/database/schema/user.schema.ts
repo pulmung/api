@@ -10,11 +10,6 @@ import { pgTable } from './table';
 export const socialProviders = ['kakao', 'google'] as const;
 export type SocialProvider = (typeof socialProviders)[number];
 
-/**
- * 1유저 = 1소셜 계정. 계정 통합(linking)을 지원하지 않기로 한 결정에 따라
- * provider/providerUserId를 users에 직접 둔다(분리 테이블·조인 불필요).
- * 로그인 식별 키는 이메일이 아니라 (provider, providerUserId) — 소셜이 주는 영구 ID.
- */
 export const users = pgTable(
   'users',
   {
@@ -22,14 +17,12 @@ export const users = pgTable(
       .primaryKey()
       .$defaultFn(() => uuidv7()),
     provider: text({ enum: socialProviders }).notNull(),
-    // 소셜이 주는 고유 식별자(google sub / kakao id). 이메일이 아니라 이 값이 매칭 키.
     providerUserId: text().notNull(),
     // 소셜이 이메일을 안 줄 수 있다(카카오 미동의/Apple 비공개 릴레이 등). 식별이 아니라 프로필 데이터.
     email: text(),
     name: text().notNull(),
     createdAt: timestamp({ withTimezone: true }).defaultNow().notNull(),
   },
-  // 같은 소셜 계정으로 중복 가입 방지 + 로그인 시 조회 키
   (t) => [unique().on(t.provider, t.providerUserId)],
 );
 
