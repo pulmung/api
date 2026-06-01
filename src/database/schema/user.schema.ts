@@ -20,7 +20,8 @@ export const users = pgTable(
     providerUserId: text().notNull(),
     // 소셜이 이메일을 안 줄 수 있다(카카오 미동의/Apple 비공개 릴레이 등). 식별이 아니라 프로필 데이터.
     email: text(),
-    name: text().notNull(),
+    // 유저가 직접 입력. 전역 유니크 — 중복 닉네임 금지.
+    nickname: text().notNull().unique(),
     createdAt: timestamp({ withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [unique().on(t.provider, t.providerUserId)],
