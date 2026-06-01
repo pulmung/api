@@ -12,8 +12,6 @@
     "allowSyntheticDefaultImports": true,
     "target": "ESNext",
     "sourceMap": true,
-    "outDir": "./dist",
-    "rootDir": "./src",
     "incremental": true,
     "skipLibCheck": true,
     "strict": true,

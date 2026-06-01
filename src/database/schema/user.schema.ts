@@ -1,5 +1,6 @@
-import { pgTable, timestamp, uuid, text } from 'drizzle-orm/pg-core';
+import { timestamp, uuid, text } from 'drizzle-orm/pg-core';
 import { uuidv7 } from 'uuidv7';
+import { pgTable } from './table';
 
 export const users = pgTable('users', {
   id: uuid()
