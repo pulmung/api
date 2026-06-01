@@ -15,20 +15,20 @@
 
 ## 기술 스택
 
-| 영역         | 선택                     | 버전        | 비고                              |
-| ------------ | ------------------------ | ----------- | --------------------------------- |
-| 런타임       | Node.js                  | 22.x        |                                   |
-| 프레임워크   | NestJS                   | ^11.1       |                                   |
-| 언어         | TypeScript               | ^6.0        | `strict`, `nodenext` 모듈 해석    |
-| 빌드         | SWC (`nest-cli` builder) | —           | `typeCheck: true`로 타입검사 병행 |
+| 영역         | 선택                     | 버전        | 비고                                          |
+| ------------ | ------------------------ | ----------- | --------------------------------------------- |
+| 런타임       | Node.js                  | 22.x        |                                               |
+| 프레임워크   | NestJS                   | ^11.1       |                                               |
+| 언어         | TypeScript               | ^6.0        | `strict`, `nodenext` 모듈 해석                |
+| 빌드         | SWC (`nest-cli` builder) | —           | `typeCheck: true`로 타입검사 병행             |
 | ORM          | Drizzle ORM              | 1.0.0-rc.3  | `drizzle-orm/node-postgres` (v1.0 RC — RQBv2) |
-| DB 드라이버  | `pg` (node-postgres)     | ^8.21       | 커넥션 풀(`pg.Pool`) 사용         |
-| 마이그레이션 | drizzle-kit              | 1.0.0-rc.3  | folders v3 (폴더별 그룹, journal 없음) |
-| DB           | PostgreSQL               | (확인 필요) |                                   |
-| 환경변수     | `@nestjs/config`         | ^4.0        | 전역 `ConfigModule` + DI          |
-| 검증         | Zod (`zod`)              | ^4.4        | env 검증 + `z.infer` 타입 파생    |
-| ID 생성      | `uuidv7`                 | ^1.2        | 앱 레벨 UUIDv7 생성               |
-| 테스트       | Vitest                   | ^4.1        | + Supertest(E2E)                  |
+| DB 드라이버  | `pg` (node-postgres)     | ^8.21       | 커넥션 풀(`pg.Pool`) 사용                     |
+| 마이그레이션 | drizzle-kit              | 1.0.0-rc.3  | folders v3 (폴더별 그룹, journal 없음)        |
+| DB           | PostgreSQL               | (확인 필요) |                                               |
+| 환경변수     | `@nestjs/config`         | ^4.0        | 전역 `ConfigModule` + DI                      |
+| 검증         | Zod (`zod`)              | ^4.4        | env 검증 + `z.infer` 타입 파생                |
+| ID 생성      | `uuidv7`                 | ^1.2        | 앱 레벨 UUIDv7 생성                           |
+| 테스트       | Vitest                   | ^4.1        | + Supertest(E2E)                              |
 
 > **방향성**: 새 의존성/패턴 도입 시 "가장 최신 트렌드 + 근거 있는 선택"을 우선한다. 관성으로 굳어진 레거시 컨벤션(예: 모든 문자열 `varchar(255)`)은 의심한다.
 
@@ -143,7 +143,6 @@ src/features/<feature>/
 - 변환은 **테이블 팩토리(`src/database/schema/table.ts`)** 에 위임한다 → 스키마에서 컬럼명 문자열을 생략한다.
   - `pgTable = pgTableCreator((name) => name, 'snake_case')`. 모든 스키마 파일은 `drizzle-orm/pg-core`가 아니라 **이 `pgTable`** 을 import 한다.
 - ⚠️ **drizzle v1.0부터 글로벌 `casing` 옵션이 제거**됐다. 더 이상 `drizzle(pool, { casing })`나 drizzle.config.ts의 `casing: 'snake_case'`로 주지 않는다 — casing은 **스키마(테이블 팩토리)에 단일 소스**로 박는다. (drizzle-kit의 `casing`은 이제 `'camel'|'preserve'`로 pull 방향 전용이다.)
-- ⚠️ v1.0 런타임 호출은 **단일 객체형** `drizzle({ client: pool })`. `(client, config)` 2-인자 오버로드는 제거됐다. RQB(`db.query`) 미사용이면 `schema`/`relations` 주입도 생략한다 — 읽기는 부분 select로 처리.
 
 ### 컬럼 타입 규칙
 
