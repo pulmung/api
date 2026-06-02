@@ -5,7 +5,6 @@ import { ZodSerializerInterceptor, ZodValidationPipe } from 'nestjs-zod';
 import { validateEnv } from './config/env.validation';
 import { AppController } from './app.controller';
 import { DrizzleModule } from './database/drizzle.module';
-import { AuthModule } from './features/auth/auth.module';
 
 @Module({
   imports: [
@@ -14,7 +13,6 @@ import { AuthModule } from './features/auth/auth.module';
       validate: validateEnv,
     }),
     DrizzleModule,
-    AuthModule,
   ],
   controllers: [AppController],
   providers: [

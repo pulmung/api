@@ -13,7 +13,13 @@ async function bootstrap() {
   // cleanupOpenApiDoc: nestjs-zod 가 생성한 스키마를 OpenAPI 규격으로 후처리(필수).
   const openApiDoc = SwaggerModule.createDocument(
     app,
-    new DocumentBuilder().setTitle('sikjipsa API').setVersion('1.0').build(),
+    new DocumentBuilder()
+      .setTitle('sikjipsa API')
+      .setVersion('1.0')
+      // OpenAPI 3.1 = JSON Schema 정렬 → nestjs-zod 의 네이티브 출력(3.0은 down-convert).
+      // null 을 anyOf 로 표현 → web/mobile codegen 입력으로 더 적합.
+      .setOpenAPIVersion('3.1.0')
+      .build(),
   );
   SwaggerModule.setup('swagger', app, cleanupOpenApiDoc(openApiDoc));
 
