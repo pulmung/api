@@ -1,8 +1,7 @@
 ## 프로젝트 개요
 
 - **sikjipsa API** — NestJS 기반 REST API 서버.
-- 목적: 최신 기술스택/컨벤션을 학습하며 적용한다. 의사결정마다 "왜"를 따진다.
-- 아키텍처: **CQRS 패턴**(쓰기는 도메인을 거치고, 읽기는 우회한다)을 채택한다.
+- 목적: 최신 기술스택/컨벤션을 학습하며 적용한다. 의사결정마다 "왜"와 "베스트 프랙티스"를 고민하며, 레거시 관성에 의한 결정이 아니라 최신 트렌드와 근거 있는 선택을 우선한다.
 
 ---
 
@@ -47,42 +46,6 @@ npx drizzle-kit studio   # GUI
 
 ---
 
-## 아키텍처: CQRS
-
-> **한 줄 요약: 쓰기(Command)는 도메인을 거치고, 읽기(Query)는 우회한다. DTO는 endpoint마다 별개로 만든다.**
-
-도메인 모델은 **쓰기를 위한 것이지 읽기를 위한 것이 아니다.** 이 전제를 받아들이면 "성능 위해 컬럼 최소 select 하고 싶은데 도메인이 막는다"는 모순이 사라진다 — 그건 읽기 경로에 도메인을 잘못 끼워 넣은 설계다.
-
-### 쓰기 경로 (Command)
-
-```
-Controller → UseCase → Domain Entity → Repository → DB
-```
-
-- 도메인 규칙/불변식(invariant)을 **Domain Entity가 캡슐화**한다.
-- Repository는 도메인 객체 단위로 저장/조회한다.
-- 상태 변경은 public setter가 아니라 **메서드(`order.cancel(now)`)** 를 통해서만.
-
-### 읽기 경로 (Query)
-
-```
-Controller → QueryService → Drizzle 부분 select(필요 컬럼/조인만) → Response DTO
-                              ↑ 도메인 객체를 거치지 않는다
-```
-
-- 성능을 위해 **필요한 컬럼만 select, 필요한 조인만** 한다.
-- Drizzle 부분 select는 **반환 타입이 projection에 맞춰 자동 추론**되므로, 전체 행 타입(`$inferSelect`)을 억지로 쓰지 않는다.
-- 각 endpoint는 **자기 전용 Response DTO**(읽기 모델)를 가진다.
-
-### DTO 설계 규칙
-
-- ❌ 모든 필드가 optional인 거대한 DTO 하나 → "타입이 거짓말을 한다".
-- ✅ endpoint별로 **정확히 그 응답 형태만** 가진 작은 DTO 여러 개.
-- DTO가 많아지는 건 정상이고 솔직한 것이다. **복잡한 1개보다 단순한 10개**.
-- `optional(?)`은 _진짜로_ 값이 없을 수 있는 곳에만 쓴다.
-
----
-
 ## 디렉토리 구조
 
 ### 인프라 (DB)
@@ -96,25 +59,6 @@ src/database/
   drizzle.module.ts       # @Global 모듈, pg.Pool 기반 커넥션 제공
 drizzle.config.ts         # (루트) drizzle-kit CLI 설정
 ```
-
-### 도메인 모듈 (CQRS, feature 단위) — 도메인 규칙이 있을 때
-
-```
-src/features/<feature>/
-  domain/                 # 순수 TS. NestJS/ORM 무관
-    <entity>.ts           #   Domain Entity (Aggregate Root)
-    <entity>.repository.ts#   Repository 인터페이스(Port)
-  application/
-    <action>.usecase.ts   #   Command (쓰기)
-    <feature>-query.service.ts  # Query (읽기) - 도메인 우회
-  infrastructure/
-    drizzle-<entity>.repository.ts  # Repository 구현(Adapter)
-  presentation/
-    <feature>.controller.ts
-    dto/                  # endpoint별 Request/Response DTO
-```
-
-> 단순 CRUD 기능은 위 풀구조가 과하다. **기능의 도메인 복잡도에 맞춰 레벨을 선택**한다(아래 도메인 모델링 참고).
 
 ---
 
@@ -157,27 +101,3 @@ src/features/<feature>/
 > **한 줄 요약: 환경변수는 신뢰 불가 외부 입력 — 부팅 시 Zod로 검증해 통과 못 하면 서버를 띄우지 않는다(fail-fast). 스키마가 단일 소스, 타입은 `z.infer`로 파생.**
 
 📄 **상세 컨벤션은 [docs/config.md](docs/config.md)에 있다. env 관련 코드(검증 스키마 `src/config/env.validation.ts`, `ConfigService` 소비, `.env.sample`)를 만지기 전에 반드시 그 파일을 읽는다.**
-
----
-
-## 테스트 전략
-
-- 프레임워크: **Vitest**(신규 프로젝트 기본값 — ESM 네이티브, TS 무설정, 빠름).
-- **E2E 위주 전략을 허용**한다. 단순 CRUD API에서는 합리적이며, NestJS의 가드/인터셉터/파이프 같은 cross-cutting concern까지 자동 검증된다.
-- 단, **복잡한 도메인 로직(분기 多, 상태 머신, 계산 규칙)은 unit test**로 따로 커버한다 — Rich Domain Model로 분리해두면 mock 없이 unit test가 쉬워진다.
-
----
-
-## 도메인 모델링 가이드
-
-레이어드 아키텍처의 약점은 **Service가 도메인 로직 + 오케스트레이션을 함께** 떠안아 mock 지옥이 되는 것. 기능의 복잡도에 맞춰 레벨을 고른다:
-
-- **Level 0 (단순 CRUD)**: DTO ↔ DB 직접. 도메인 객체 없음. 틀린 게 아니다.
-- **Level 1 (규칙 약간) — sweet spot**: Entity에 도메인 메서드 추가(rich) + DTO 분리.
-- **Level 2 (도메인이 핵심)**: Domain Entity ↔ Persistence Model 분리 + Mapper.
-- **Level 3 (대규모/장기)**: Value Object, Aggregate, Domain Event 등 DDD 풀세트.
-
-원칙:
-
-- **빈약한 모델(anemic) 지양** — 데이터와 행동을 같은 객체에 응집시켜 unit test 가능하게 한다.
-- ORM/DB row, HTTP DTO를 그대로 도메인 객체로 쓰지 않는다(책임이 다르다).
