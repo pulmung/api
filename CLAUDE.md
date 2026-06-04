@@ -62,6 +62,29 @@ drizzle.config.ts         # (루트) drizzle-kit CLI 설정
 
 ---
 
+## 아키텍처 / 코딩 컨벤션
+
+> **한 줄 요약: feature-first + 헥사고날 변형 + CQRS(개념). 의존은 항상 안쪽으로, 추상화는 관성이 아니라 매번 "값"을 계산해서 도입한다.**
+
+📄 **상세는 [@docs/architecture.md](docs/architecture.md)에 있다. `features/` 하위 코드(도메인·유스케이스·어댑터·DTO)를 만지기 전에 반드시 읽는다.** 참조 구현: `features/auth` + `features/user` (소셜 회원가입 `POST /auth/signup`).
+
+### feature 구조 (요약)
+
+```
+src/features/<feature>/
+  domain/          순수 TS — 엔티티·도메인예외·도메인 원시타입 (import 0)
+  application/     유스케이스(오케스트레이션) (+ 정말 필요할 때만 포트)
+  repository/      쓰기(writer)·읽기(reader) 어댑터    ← DB (user류)
+  infrastructure/  외부연동 어댑터(verifier·issuer)    ← HTTP·JWT (auth류)
+  presentation/    controller · dto/ · (filter)
+  <feature>.module.ts
+```
+
+- 의존 방향: `presentation → application → domain ← infra`. 모듈 간 횡단은 **"사용 → 소유"** 한 방향 (예: `auth → user`).
+- 엔티티는 "가장 오래 책임지는 컨텍스트"가 소유한다 (예: `User` = user). 경계를 넘겨 쓰려면 `exports`로 공개.
+
+---
+
 ## 데이터베이스 / Drizzle 컨벤션
 
 ### 스키마 파일

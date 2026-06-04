@@ -10,11 +10,11 @@
 
 ## 방식 종류 (참고)
 
-| 방식 | 백엔드가 받는 것 | 검증 방법 | 채택 |
-| --- | --- | --- | --- |
-| ① Authorization Code | code | client_secret로 서버 교환 | ❌ |
-| **② Access Token** | access_token | provider introspection + 출처(aud/app_id) 비교 | ✅ |
-| ③ ID Token (OIDC) | id_token(JWT) | JWKS 서명검증 (오프라인) | ❌ |
+| 방식                 | 백엔드가 받는 것 | 검증 방법                                      | 채택 |
+| -------------------- | ---------------- | ---------------------------------------------- | ---- |
+| ① Authorization Code | code             | client_secret로 서버 교환                      | ❌   |
+| **② Access Token**   | access_token     | provider introspection + 출처(aud/app_id) 비교 | ✅   |
+| ③ ID Token (OIDC)    | id_token(JWT)    | JWKS 서명검증 (오프라인)                       | ❌   |
 
 ② 선택 이유: 카카오 네이티브 SDK가 access_token을 바로 주고, 단일 모델로 카카오·구글을 처리.
 트레이드오프: 로그인마다 provider 호출 1~2회(캐시 불가).
@@ -30,7 +30,7 @@
 4. 가입/로그인 → 우리 자체 JWT(access+refresh) 발급
 ```
 
-> ⚠️ **출처 검증을 빼면 안 된다.** userinfo류(`user/me`, `userinfo`)는 *유효한 토큰이면 어느 앱 거든* 통과시킨다 → 공격자가 자기 앱 토큰으로 임의 계정에 로그인 가능. 출처 검증은 introspection 엔드포인트(`access_token_info` / `tokeninfo`)에서만 된다.
+> ⚠️ **출처 검증을 빼면 안 된다.** userinfo류(`user/me`, `userinfo`)는 _유효한 토큰이면 어느 앱 거든_ 통과시킨다 → 공격자가 자기 앱 토큰으로 임의 계정에 로그인 가능. 출처 검증은 introspection 엔드포인트(`access_token_info` / `tokeninfo`)에서만 된다.
 
 ---
 
@@ -44,6 +44,7 @@
 ```
 GET https://oauth2.googleapis.com/tokeninfo?access_token=<ACCESS_TOKEN>
 ```
+
 ```json
 {
   "aud": "<client_id>.apps.googleusercontent.com",
@@ -56,6 +57,7 @@ GET https://oauth2.googleapis.com/tokeninfo?access_token=<ACCESS_TOKEN>
 ```
 
 검증 순서:
+
 1. **출처**: `aud`(또는 `azp`) ∈ 우리 OAuth **Client ID 집합** → 불일치 시 401
 2. `exp` 만료 확인
 3. `sub`(구글 고유 ID) + `email`로 가입/로그인
@@ -71,23 +73,32 @@ GET https://oauth2.googleapis.com/tokeninfo?access_token=<ACCESS_TOKEN>
 `access_token_info`가 `app_id`만 주고 email은 안 주므로 **2콜** 필요.
 
 **① 출처 검증 — `access_token_info`:**
+
 ```
 GET https://kapi.kakao.com/v1/user/access_token_info
 Authorization: Bearer <ACCESS_TOKEN>
 ```
+
 ```json
 { "id": 4728944876, "app_id": 1347156, "expires_in": 21467 }
 ```
+
 → `app_id` === 우리 카카오 앱 id → 불일치 시 401
 
 **② 신원 조회 — `user/me`:**
+
 ```
 GET https://kapi.kakao.com/v2/user/me
 Authorization: Bearer <ACCESS_TOKEN>
 ```
+
 ```json
-{ "id": 4728944876, "kakao_account": { "email": "user@kakao.com", "is_email_verified": true } }
+{
+  "id": 4728944876,
+  "kakao_account": { "email": "user@kakao.com", "is_email_verified": true }
+}
 ```
+
 → `id`(회원번호) + email로 가입/로그인
 
 > 식별 키는 `id`(회원번호). 카카오는 한 앱에 Android/iOS/Web 플랫폼을 묶으므로 `app_id`는 **단일 비교**.
@@ -97,12 +108,14 @@ Authorization: Bearer <ACCESS_TOKEN>
 ## 백엔드 설계
 
 엔드포인트:
+
 ```
-POST /auth/social
+POST /auth/social (예시)
 { "provider": "google" | "kakao", "accessToken": "..." }
 ```
 
 provider별 verifier:
+
 ```
 google: tokeninfo  → aud ∈ clientIds 검증           → { sub, email }
 kakao : access_token_info → app_id === appId 검증
@@ -112,10 +125,10 @@ kakao : access_token_info → app_id === appId 검증
 
 검증값 요약:
 
-| provider | 출처 검증 필드 | 비교 대상(env) | 신원 키 |
-| --- | --- | --- | --- |
-| google | `aud` / `azp` | `GOOGLE_CLIENT_IDS`(집합) | `sub` |
-| kakao | `app_id` | `KAKAO_APP_ID` | `id` |
+| provider | 출처 검증 필드 | 비교 대상(env)            | 신원 키 |
+| -------- | -------------- | ------------------------- | ------- |
+| google   | `aud` / `azp`  | `GOOGLE_CLIENT_IDS`(집합) | `sub`   |
+| kakao    | `app_id`       | `KAKAO_APP_ID`            | `id`    |
 
 ---
 

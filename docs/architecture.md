@@ -1,0 +1,164 @@
+# 아키텍처 / 코딩 컨벤션 (architecture)
+
+> 이 문서는 [CLAUDE.md](../CLAUDE.md)의 "아키텍처 / 설계" 상세본이다.
+> **`features/` 하위 코드(도메인·유스케이스·어댑터·DTO)를 만지기 전에 읽는다.**
+
+> **한 줄 요약: feature-first + 헥사고날 변형 + CQRS(개념). 의존은 항상 안쪽으로, 추상화는 관성이 아니라 매번 "값"을 계산해서 도입한다.**
+
+> **참조 구현**: `features/auth` + `features/user` (소셜 회원가입 `POST /auth/signup`).
+
+> ⚠️ **이 문서는 모든 feature·리소스에 적용되는 *일반 컨벤션*이다.** `auth`/`user`는 원칙이 처음 구현된 **참조 예시**일 뿐 — 앞으로 추가될 리소스(`post`·`comment`·`commerce`…)도 동일 원칙을 따른다. 본문의 특정 클래스·필드명(`User`, `VerifiedIdentity`, `socialProviders` 등)과 `예:` 표기는 **현재 구현 예시**이지 규칙이 아니다. 규칙은 그 위의 리소스-중립적 서술이다.
+
+---
+
+## 0. 의사결정 원칙 (메타)
+
+- 모든 결정에 **"왜"** 를 따진다. 관성·의례로 굳은 패턴을 의심한다.
+- 베스트 프랙티스/최신 트렌드를 우선하되 **도그마 없이 케이스마다 비용 대비 값을 계산**한다.
+- 추상화(인터페이스·레이어·분리)는 공짜가 아니다 — 간접성·파일 수·인지부하가 비용이다. "지금 이게 필요한가"를 매번 묻는다.
+- 필요해지면 그때 도입한다(YAGNI). `extract interface` 같은 건 IDE가 30초에 해준다 — 미리 만들지 않는다.
+
+---
+
+## 1. 레이어 & 의존 방향
+
+```
+presentation → application → domain ← (repository | infrastructure)
+                       의존은 항상 안쪽(domain)으로
+```
+
+| 레이어 | 책임 | 의존 |
+| --- | --- | --- |
+| **domain** | 엔티티·불변식·도메인 예외·도메인 원시타입 | **import 0** (NestJS·Drizzle·HTTP 모름) |
+| **application** | 유스케이스(오케스트레이션). 도메인 조립 | domain + 외부(추상 또는 깨끗한 구현) |
+| **repository / infrastructure** | 바깥세상 어댑터(DB·HTTP·JWT) | domain을 구현/참조 |
+| **presentation** | HTTP 입출력(controller·dto·filter) | application |
+
+- **리트머스**: domain 파일이 인프라를 import하면 설계 오류다. ORM enum조차 **도메인이 소유**하고 스키마가 거꾸로 참조한다(DIP). 예: `SocialProvider`는 `user/domain`이 소유, `user.schema.ts`가 import.
+
+---
+
+## 2. CQRS (개념만)
+
+- "읽기와 쓰기는 다른 모델을 써도 된다"만 채택. **`@nestjs/cqrs`(CommandBus) 미도입** — 이벤트소싱/비동기 분리가 필요할 때까지 YAGNI.
+- **쓰기**: 도메인을 거친다. UseCase = Command 핸들러(`XxxUseCase.execute`). 도메인 엔티티 → `writer`.
+- **읽기**: 도메인을 우회한다. `reader`가 DB → 전용 DTO 직빵(부분 select 자유).
+- UseCase **1개 = 1 클래스 + `execute`** (동작마다 의존이 다를 때). 의존이 거의 같으면 한 서비스로 묶어도 됨 — 기준은 **의존 응집도**이지 규칙이 아니다.
+
+---
+
+## 3. 모듈 / 폴더 (feature-first)
+
+```
+features/<feature>/
+  domain/          엔티티·도메인예외·도메인 원시타입 (순수 TS)
+  application/     유스케이스 (+ 정말 필요할 때만 포트)
+  repository/      쓰기(writer)·읽기(reader) 어댑터    ← DB 접근 (user류)
+  infrastructure/  외부연동 어댑터(verifier·issuer)    ← HTTP·JWT (auth류)
+  presentation/    controller · dto/ · (filter)
+  <feature>.module.ts
+```
+
+- **엔티티 소유권**: 엔티티는 "그것을 가장 오래·가장 많이 책임지는 컨텍스트"가 소유한다. (예: `User`는 `user`가 소유, `auth`는 *사용*만.)
+- **모듈 간 의존**: 순환 없이 **"사용하는 쪽 → 소유하는 쪽"** 한 방향. 양방향 참조가 필요하면 모듈 경계가 틀렸다는 신호. (예: auth가 User를 쓰므로 `auth → user`.)
+- 모듈 경계를 넘겨 쓰려면 **`exports`로 공개**한다. (예: `UserModule` exports `UserWriter`.)
+- **단순함 우선**: 한 리소스를 여러 엔티티/테이블로 쪼개는 것은 요구가 실제로 생길 때 도입한다(YAGNI). (예: `User=계정` 통합모델을 택하고, 멀티소셜 연결이 필요해지면 그때 `SocialAccount`로 분리.)
+- `domain/` 밑에 repository/infra를 두지 않는다(도메인 순수성 오염).
+
+---
+
+## 4. 포트(interface) vs 구현 직접 — 판단 기준
+
+- **핵심**: 경계의 본질은 `interface` 키워드가 아니라 **"public 시그니처가 도메인 언어인가"** 다. ORM/HTTP 타입이 시그니처에 새면 인터페이스가 있어도 무의미(leaky = 비용만, 이득 0).
+- 인터페이스는 **값을 할 때만** 도입한다:
+  - 새 구현 추가가 잦다(OCP 플러그인 확장)
+  - **모듈 경계 공개 계약**
+  - 테스트에서 전체를 갈아끼워야 한다
+- 구현 1개 + 교체 계획 없음 + E2E 테스트 → **구현 직접**(클래스가 곧 DI 토큰, `Symbol` 불필요).
+- **신뢰는 타입이 아니라 런타임이 준다**: 인터페이스는 컴파일 타임 약속일 뿐. 외부 입력의 진짜 보증은 경계의 Zod 검증이다(§8).
+- 참조구현: `UserWriter`·`SocialIdentityVerifier`·`JwtTokenIssuer` 모두 구현 직접 — 같은 원칙을 케이스마다 계산한 결과다.
+
+---
+
+## 5. 타입: 추론 vs 명시
+
+- **경계(함수 반환·공개 계약·모듈 간 데이터) → 명시.** 구현 실수가 조용히 새는 걸 막고, 에러를 근원에 가둔다.
+- **내부(지역변수·중간값·읽기 모델) → 추론.** 이중 관리를 없앤다(스키마 `$inferSelect`, `z.infer`와 같은 철학).
+- 의례적 명시는 피한다. 추론으로 충분하면 추론. 단 **외부로 흐르는 응답 계약**은 명시가 안전하다(codegen에 전파되므로).
+
+---
+
+## 6. 도메인 모델링
+
+- 엔티티: **`private constructor` + 정적 팩토리**(`User.register`). 불변식을 한 곳에 응집 → "유효하지 않은 상태를 표현 불가능"하게.
+- **자기완결적 불변식**(닉네임 형식)은 엔티티가. **컨텍스트 의존 규칙**(전역 유니크)은 DB 제약 + repository가 — 엔티티 혼자선 알 수 없다.
+- 도메인 예외: `abstract` 베이스 + 구체 클래스. **`HttpException` 상속 금지**(도메인은 HTTP 모름). 베이스는 `@Catch`용 카테고리, 던지는 건 항상 구체.
+- HTTP 매핑은 presentation의 `ExceptionFilter` 한 곳에서(여러 모듈을 잡는 횡단이면 `common/filters/`).
+
+---
+
+## 7. 영속성 & 에러 처리
+
+- **DB 유니크 제약이 신뢰의 원천.** 사전 SELECT 금지 — INSERT 후 충돌(`23505`)을 잡아 도메인 예외로 변환(race-safe + 1쿼리).
+- drizzle(node-postgres)은 raw `pg.DatabaseError`를 전파 → `e instanceof DatabaseError && e.code === '23505'` + `e.constraint`로 분기. 제약엔 **명시적 이름** 부여(자동 네이밍 의존 회피, 상수로 단일 소스화).
+- 두 충돌(닉네임 중복 vs 이미 가입)을 클라가 다르게 처리해야 하면 구분, 아니면 단일 `ConflictError`로 단순화.
+- **모르는 에러는 rethrow** — 삼키지 않는다(필터가 500).
+
+---
+
+## 8. 외부 연동 (어댑터)
+
+- 외부 응답(소셜 HTTP)·env는 **신뢰 불가 입력 → Zod로 파싱**한다([config.md](config.md) 철학).
+- 어댑터가 provider별 raw 응답을 **공통 형태로 정규화**한다(`VerifiedIdentity`). usecase는 provider 종류를 모른다 — 응답이 다를수록 정규화가 usecase를 보호한다.
+- `fetch`(native, 의존성 0) + `AbortSignal.timeout`. **출처 검증을 신원 조회보다 먼저**([social-auth.md](social-auth.md)).
+
+---
+
+## 9. DTO & presentation
+
+- **endpoint별 작은 파일.** 모듈 거대 묶음(`auth.request.ts`에 전부)·`request/`·`response/` 폴더 분리 금지(feature-first 역행). 분류가 필요하면 폴더가 아니라 **파일명 suffix**.
+- **응답 공유 기준 = "변경 이유가 같은가"**. 같으면 공유(`AuthTokensDto`를 login/signup/refresh가), 다르면 분리.
+- 모듈 간 응답 중첩 회피 → 순환 방지장치(`base.response`)가 애초에 불필요. 각 DTO는 자기 endpoint의 계약(optional 떡칠 만능 DTO 금지 = 거짓말 금지).
+- nestjs-zod: 요청 `createZodDto` + 글로벌 `ZodValidationPipe`. 응답 **`@ZodResponse`**(직렬화 + OpenAPI 문서 + 컴파일 반환검증, 공식 권장 / `@ZodSerializerDto`보다 우위). 문서화는 `.meta({ description, example })` / `.describe()`.
+- `additionalProperties: false`("forbidden")는 **정상이자 자산** — 정확한 계약 + 누출 방지 + codegen 정확성. 유지.
+
+---
+
+## 10. 토큰 / 보안
+
+- JWT payload는 **최소**(`{ sub: user.id }`). 자주 변하는 것(닉네임)·민감정보 금지(base64라 디코드된다).
+- `secret`·`expiresIn`은 `JwtModule.registerAsync`에 한 번 설정, `sign`은 payload만.
+- 클라가 보낸 신원 불신 — 검증된 값(`identity`)만 진실로 사용([social-auth.md](social-auth.md)).
+
+---
+
+## 11. 데이터 수집
+
+- 저장 항목은 **"우리 도메인이 필요로 하는 것"** 이 정한다(provider 응답이 아니라). **수집 가능 ≠ 수집해야** — 최소수집(개인정보보호법).
+- 정말 필요하면 모든 유저에게 **일관 수집**한다(provider 비대칭에 기대지 않는다).
+
+---
+
+## 12. 네이밍
+
+- `UPPER_SNAKE`: 매직 원시값·문자열 상수·DI 토큰 (`DRIZZLE`, `UNIQUE_USERS_NICKNAME`).
+- `camelCase`: 데이터 배열 + 파생타입 패턴 (`socialProviders` ↔ 타입 `SocialProvider`).
+- **wire 값**(API·DB에 나가는 식별자, 예: provider id): 그 도메인의 통용 표기 — OAuth provider는 **소문자**(`'kakao'`, `'google'`).
+- DB casing(코드 camelCase ↔ DB snake_case)·테이블 복수형/파일 단수형은 [CLAUDE.md](../CLAUDE.md) 참조.
+
+---
+
+## 13. 앱 레벨 횡단 (글로벌 프로바이더)
+
+> 검증·직렬화·예외매핑은 **`app.module`에 글로벌로 한 번** 등록한다. feature는 데코레이터로만 참여하고, 컨트롤러·유스케이스엔 그 boilerplate를 두지 않는다.
+
+| 토큰 | 등록 | 역할 | feature가 참여하는 법 |
+| --- | --- | --- | --- |
+| `APP_PIPE` | `ZodValidationPipe` | 요청 `@Body`/`@Query`를 DTO 스키마로 **검증** (실패 시 400) | `@Body() dto: XxxDto` (`createZodDto`) |
+| `APP_INTERCEPTOR` | `ZodSerializerInterceptor` | 응답을 DTO 스키마로 **직렬화**(strip → 누출 방지) | `@ZodResponse({ type: XxxDto })` |
+| `APP_FILTER` | `DomainErrorFilter` | **도메인 예외 → HTTP 코드** 매핑 | 도메인 예외를 `throw` (잡지 않음) |
+
+- **컨트롤러·유스케이스는 수동 검증/직렬화/try-catch를 하지 않는다** — 위 3개가 횡단으로 처리한다. 컨트롤러는 얇게 유지된다.
+- 새 도메인 예외 **베이스**가 생기면 `DomainErrorFilter`의 `@Catch(...)`에 추가하고 매핑을 더한다(`common/filters/`). 구체 예외는 베이스를 상속만 하면 자동 포착된다(§6).
+- 글로벌 등록 위치는 `app.module`의 `providers`. OpenAPI 스펙 노출(codegen 단일 소스)은 `main.ts`의 Swagger 설정이며, 글로벌 직렬화와 별개다.
+- 횡단으로 올릴지 feature 로컬에 둘지 기준: **앱 전체에 일관 적용돼야 하면 글로벌**(`APP_*`), 특정 라우트에만 필요하면 데코레이터/로컬. (검증·직렬화·도메인예외 매핑은 전자.)

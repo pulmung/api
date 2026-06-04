@@ -1,14 +1,10 @@
 import { timestamp, uuid, text, unique } from 'drizzle-orm/pg-core';
 import { uuidv7 } from 'uuidv7';
 import { pgTable } from './table';
+import { socialProviders } from '../../features/user/domain/social-provider';
 
-/**
- * 지원하는 소셜 인증 제공자.
- * pgEnum(DB 타입) 대신 text + TS 유니온으로 둔다 → provider 추가가 코드 한 줄
- * (pgEnum은 ALTER TYPE 마이그레이션 필요). 들어오는 값은 앱이 통제한다.
- */
-export const socialProviders = ['kakao', 'google'] as const;
-export type SocialProvider = (typeof socialProviders)[number];
+export const UNIQUE_USERS_NICKNAME = 'uq_users_nickname';
+export const UNIQUE_USERS_PROVIDER_ACCOUNT = 'uq_users_provider_account';
 
 export const users = pgTable(
   'users',
@@ -21,10 +17,12 @@ export const users = pgTable(
     // 소셜이 이메일을 안 줄 수 있다(카카오 미동의/Apple 비공개 릴레이 등). 식별이 아니라 프로필 데이터.
     email: text(),
     // 유저가 직접 입력. 전역 유니크 — 중복 닉네임 금지.
-    nickname: text().notNull().unique(),
+    nickname: text().notNull().unique(UNIQUE_USERS_NICKNAME),
     createdAt: timestamp({ withTimezone: true }).defaultNow().notNull(),
   },
-  (t) => [unique().on(t.provider, t.providerUserId)],
+  (t) => [
+    unique(UNIQUE_USERS_PROVIDER_ACCOUNT).on(t.provider, t.providerUserId),
+  ],
 );
 
 // 타입 추론: 쿼리 결과(select) / 삽입(insert)용 타입을 스키마에서 자동 생성
