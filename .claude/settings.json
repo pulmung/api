@@ -54,7 +54,8 @@
       "Bash(npm list:*)",
       "Bash(npm view:*)",
       "Bash(npm outdated:*)",
-      "Bash(npx tsc --noEmit:*)"
+      "Bash(npx tsc --noEmit:*)",
+      "Bash(npx eslint:*)"
     ]
   }
 }

@@ -92,8 +92,8 @@ features/<feature>/
 
 - 엔티티: **`private constructor` + 정적 팩토리**(`User.register`). 불변식을 한 곳에 응집 → "유효하지 않은 상태를 표현 불가능"하게.
 - **자기완결적 불변식**(닉네임 형식)은 엔티티가. **컨텍스트 의존 규칙**(전역 유니크)은 DB 제약 + repository가 — 엔티티 혼자선 알 수 없다.
-- 도메인 예외: `abstract` 베이스 + 구체 클래스. **`HttpException` 상속 금지**(도메인은 HTTP 모름). 베이스는 `@Catch`용 카테고리, 던지는 건 항상 구체.
-- HTTP 매핑은 presentation의 `ExceptionFilter` 한 곳에서(여러 모듈을 잡는 횡단이면 `common/filters/`).
+- 도메인 예외: 공통 `abstract DomainError` 베이스(`code` + `status` 보유) + 구체 클래스. **`HttpException` 상속 금지**(NestJS 클래스 결합 회피) — 단 `code`(machine-readable 도메인 식별자) + `status`(HttpStatus)는 예외가 **자기 모듈 안에서 소유**한다. 에러를 모듈에 응집시켜 전역 errorCode 카탈로그·필터 매핑 테이블을 없애기 위함. (status 숫자 보유 ≠ HttpException 상속 — 다른 전송이면 어댑터가 다시 매핑하면 그만. REST-only에선 이 "HTTP 인지"가 모듈 응집을 위한 실용적 타협.)
+- **errorCode 단일 소스**: `code`는 구체 예외 **한 곳**에만 리터럴로 둔다. 전역 카탈로그로 모으지 않는다(feature-first 역행 — DTO 거대 묶음과 같은 안티패턴). HTTP 변환은 글로벌 필터(§13)가 예외의 `status`를 **직렬화만** 한다(매핑 테이블 없음 → 새 예외에도 필터 수정 0).
 
 ---
 
@@ -156,9 +156,11 @@ features/<feature>/
 | --- | --- | --- | --- |
 | `APP_PIPE` | `ZodValidationPipe` | 요청 `@Body`/`@Query`를 DTO 스키마로 **검증** (실패 시 400) | `@Body() dto: XxxDto` (`createZodDto`) |
 | `APP_INTERCEPTOR` | `ZodSerializerInterceptor` | 응답을 DTO 스키마로 **직렬화**(strip → 누출 방지) | `@ZodResponse({ type: XxxDto })` |
-| `APP_FILTER` | `DomainErrorFilter` | **도메인 예외 → HTTP 코드** 매핑 | 도메인 예외를 `throw` (잡지 않음) |
+| `APP_FILTER` | `GlobalExceptionFilter` (`@Catch()` catch-all) | **모든 예외의 최후 방어선** — `DomainError`는 `status`+`errorCode` 직렬화 / `HttpException`은 그대로 / 미처리는 500 + 구조화 로깅 | 도메인 예외를 `throw` (잡지 않음) |
 
 - **컨트롤러·유스케이스는 수동 검증/직렬화/try-catch를 하지 않는다** — 위 3개가 횡단으로 처리한다. 컨트롤러는 얇게 유지된다.
-- 새 도메인 예외 **베이스**가 생기면 `DomainErrorFilter`의 `@Catch(...)`에 추가하고 매핑을 더한다(`common/filters/`). 구체 예외는 베이스를 상속만 하면 자동 포착된다(§6).
+- `GlobalExceptionFilter`는 `@Catch()`(catch-all, `common/filters/`)라 **새 예외가 생겨도 필터 수정 0** — `DomainError`를 상속하고 `code`+`status`만 주면 자동 처리된다(§6). 미처리(unexpected) 에러만 request 메타와 함께 로깅하고, **스택은 클라에 노출하지 않는다**(보안). 도메인/`HttpException`은 "예상된" 에러라 로깅하지 않는다(노이즈 방지).
+- **에러 응답 형태 통일**: `{ statusCode, errorCode, message }`. 클라(codegen)가 `errorCode`로 분기한다.
+- **에러 OpenAPI 문서화**: 글로벌 필터의 응답은 정적 분석이 안 되므로, 엔드포인트가 던지는 도메인 예외를 `@ApiErrors(...예외클래스)`(`common/swagger/`)로 선언 → status별 `errorCode` enum이 스펙에 박혀 codegen으로 프론트에 전달된다. **엔드포인트별 응답 클래스를 손으로 만들지 않는다**(보일러플레이트 회피).
 - 글로벌 등록 위치는 `app.module`의 `providers`. OpenAPI 스펙 노출(codegen 단일 소스)은 `main.ts`의 Swagger 설정이며, 글로벌 직렬화와 별개다.
 - 횡단으로 올릴지 feature 로컬에 둘지 기준: **앱 전체에 일관 적용돼야 하면 글로벌**(`APP_*`), 특정 라우트에만 필요하면 데코레이터/로컬. (검증·직렬화·도메인예외 매핑은 전자.)
