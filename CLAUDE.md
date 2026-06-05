@@ -124,3 +124,11 @@ src/features/<feature>/
 > **한 줄 요약: 환경변수는 신뢰 불가 외부 입력 — 부팅 시 Zod로 검증해 통과 못 하면 서버를 띄우지 않는다(fail-fast). 스키마가 단일 소스, 타입은 `z.infer`로 파생.**
 
 📄 **상세 컨벤션은 [docs/config.md](docs/config.md)에 있다. env 관련 코드(검증 스키마 `src/config/env.validation.ts`, `ConfigService` 소비, `.env.sample`)를 만지기 전에 반드시 그 파일을 읽는다.**
+
+---
+
+## 테스트 (test)
+
+> **한 줄 요약: 각 관심사를 "가장 싸게 신뢰를 주는 레벨"에서 테스트한다 — 구조(도메인 응집)가 *어디서* 테스트할지를 결정한다. E2E 백본은 필수, 엣지는 unit으로.**
+
+📄 **상세는 [docs/testing.md](docs/testing.md)에 있다. 테스트 코드를 작성/추가하기 전에 읽는다.** unit·통합은 `*.spec.ts` **co-location**, E2E는 `test/*.e2e-spec.ts`. 러너는 **Vitest**(globals 미사용, `import`), 외부 API mock은 **MSW**.
