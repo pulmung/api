@@ -69,9 +69,9 @@ describe('SocialIdentityVerifier - google', () => {
 
 describe('SocialIdentityVerifier - kakao', () => {
   const mockKakao = (o: {
-    info?: unknown;
+    info?: JsonBodyType;
     infoStatus?: number;
-    me?: unknown;
+    me?: JsonBodyType;
     meStatus?: number;
   }) =>
     server.use(
