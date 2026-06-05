@@ -18,6 +18,6 @@
     "strictPropertyInitialization": false,
     "forceConsistentCasingInFileNames": true,
     "noFallthroughCasesInSwitch": true,
-    "types": ["node", "vitest/globals"]
+    "types": ["node"]
   }
 }
