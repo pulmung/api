@@ -15,3 +15,8 @@ export class UserAlreadyRegisteredError extends DomainError {
   readonly code = 'USER_ALREADY_REGISTERED';
   readonly status = HttpStatus.CONFLICT;
 }
+
+export class UserNotFoundError extends DomainError {
+  readonly code = 'USER_NOT_FOUND';
+  readonly status = HttpStatus.NOT_FOUND;
+}

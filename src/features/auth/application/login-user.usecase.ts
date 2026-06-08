@@ -1,22 +1,21 @@
 import { Injectable } from '@nestjs/common';
-import { User } from '../../user/domain/user';
-import { UserWriter } from '../../user/repository/user.writer';
-import { SocialProvider } from '../../user/domain/social-provider';
 import { SocialIdentityVerifier } from '../infrastructure/social/identity.verifier';
+import { UserReader } from '../../user/repository/user.reader';
 import { DeviceContext, SessionIssuer } from './session.issuer';
+import { SocialProvider } from '../../user/domain/social-provider';
+import { UserNotFoundError } from '../../user/domain/user.error';
 
 @Injectable()
-export class SignupUserUseCase {
+export class LoginUserUseCase {
   constructor(
     private readonly verifier: SocialIdentityVerifier,
-    private readonly userWriter: UserWriter,
+    private readonly userReader: UserReader,
     private readonly sessionIssuer: SessionIssuer,
   ) {}
 
   async execute(command: {
     provider: SocialProvider;
     accessToken: string;
-    nickname: string;
     device: DeviceContext;
   }) {
     const identity = await this.verifier.verify({
@@ -24,14 +23,12 @@ export class SignupUserUseCase {
       accessToken: command.accessToken,
     });
 
-    const user = User.register({
-      provider: identity.provider,
-      providerUserId: identity.providerUserId,
-      email: identity.email,
-      nickname: command.nickname,
-    });
+    const user = await this.userReader.findByProviderUserId(
+      identity.provider,
+      identity.providerUserId,
+    );
+    if (!user) throw new UserNotFoundError();
 
-    await this.userWriter.create(user);
     return this.sessionIssuer.issue(user.id, command.device);
   }
 }

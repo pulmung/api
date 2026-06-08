@@ -1,4 +1,5 @@
 import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { cleanupOpenApiDoc } from 'nestjs-zod';
@@ -6,8 +7,14 @@ import { AppModule } from './app.module';
 import { Env } from './config/env.validation';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
   const configService = app.get<ConfigService<Env, true>>(ConfigService);
+
+  app.set(
+    'trust proxy',
+    configService.get('TRUST_PROXY_HOPS', { infer: true }),
+  );
 
   // OpenAPI 스펙을 단일 소스로 노출 → web/mobile codegen 입력.
   // cleanupOpenApiDoc: nestjs-zod 가 생성한 스키마를 OpenAPI 규격으로 후처리(필수).

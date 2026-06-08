@@ -7,6 +7,10 @@ import { AuthController } from './presentation/auth.controller';
 import { SignupUserUseCase } from './application/signup-user.usecase';
 import { SocialIdentityVerifier } from './infrastructure/social/identity.verifier';
 import { JwtTokenIssuer } from './infrastructure/jwt-token.issuer';
+import { LoginUserUseCase } from './application/login-user.usecase';
+import { SessionReader } from './repository/session.reader';
+import { SessionWriter } from './repository/session.writer';
+import { SessionIssuer } from './application/session.issuer';
 
 @Module({
   imports: [
@@ -22,6 +26,14 @@ import { JwtTokenIssuer } from './infrastructure/jwt-token.issuer';
     }),
   ],
   controllers: [AuthController],
-  providers: [SignupUserUseCase, SocialIdentityVerifier, JwtTokenIssuer],
+  providers: [
+    SignupUserUseCase,
+    SocialIdentityVerifier,
+    JwtTokenIssuer,
+    LoginUserUseCase,
+    SessionReader,
+    SessionWriter,
+    SessionIssuer,
+  ],
 })
 export class AuthModule {}

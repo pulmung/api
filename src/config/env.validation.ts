@@ -25,6 +25,10 @@ const envSchema = z.object({
   // ── 자체 JWT ── (현재 access 토큰만. refresh 는 추후)
   JWT_ACCESS_SECRET: z.string(),
   JWT_ACCESS_EXPIRES_IN: z.string().default('15m'),
+
+  REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().min(0).default(30),
+
+  TRUST_PROXY_HOPS: z.coerce.number().int().default(1),
 });
 
 export type Env = z.infer<typeof envSchema>;
