@@ -12,6 +12,7 @@ import {
   UserAlreadyRegisteredError,
 } from '../domain/user.error';
 import { DrizzleQueryError } from 'drizzle-orm';
+import { PG_ERROR_CODE } from '../../../database/postgres-error';
 
 @Injectable()
 export class UserWriter {
@@ -28,7 +29,10 @@ export class UserWriter {
       });
     } catch (e) {
       const cause = e instanceof DrizzleQueryError ? e.cause : e;
-      if (cause instanceof DatabaseError && cause.code === '23505') {
+      if (
+        cause instanceof DatabaseError &&
+        cause.code === PG_ERROR_CODE.UNIQUE_VIOLATION
+      ) {
         if (cause.constraint === UNIQUE_USERS_NICKNAME)
           throw new NicknameTakenError();
         if (cause.constraint === UNIQUE_USERS_PROVIDER_ACCOUNT)
