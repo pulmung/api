@@ -100,7 +100,7 @@ features/<feature>/
 ## 7. 영속성 & 에러 처리
 
 - **DB 유니크 제약이 신뢰의 원천.** 사전 SELECT 금지 — INSERT 후 충돌(`23505`)을 잡아 도메인 예외로 변환(race-safe + 1쿼리).
-- drizzle(node-postgres)은 raw `pg.DatabaseError`를 전파 → `e instanceof DatabaseError && e.code === '23505'` + `e.constraint`로 분기. 제약엔 **명시적 이름** 부여(자동 네이밍 의존 회피, 상수로 단일 소스화).
+- drizzle v1.0은 쿼리 에러를 `DrizzleQueryError`로 **wrap**하고 원본 `pg.DatabaseError`는 `.cause`에 둔다 → `const cause = e instanceof DrizzleQueryError ? e.cause : e`로 꺼낸 뒤 `cause instanceof DatabaseError && cause.code === '23505'` + `cause.constraint`로 분기. 제약엔 **명시적 이름** 부여(자동 네이밍 의존 회피, 상수로 단일 소스화). ⚠️ raw pg 전파가 아니라 wrap이므로 `.cause` 추출이 필수 — E2E로 발견한 실제 동작이다.
 - 두 충돌(닉네임 중복 vs 이미 가입)을 클라가 다르게 처리해야 하면 구분, 아니면 단일 `ConflictError`로 단순화.
 - **모르는 에러는 rethrow** — 삼키지 않는다(필터가 500).
 

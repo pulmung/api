@@ -11,6 +11,8 @@ import { LoginUserUseCase } from './application/login-user.usecase';
 import { SessionReader } from './repository/session.reader';
 import { SessionWriter } from './repository/session.writer';
 import { SessionIssuer } from './application/session.issuer';
+import { RefreshSessionUseCase } from './application/refresh-session.usecase';
+import { LogoutUseCase } from './application/logout.usecase';
 
 @Module({
   imports: [
@@ -34,6 +36,8 @@ import { SessionIssuer } from './application/session.issuer';
     SessionReader,
     SessionWriter,
     SessionIssuer,
+    RefreshSessionUseCase,
+    LogoutUseCase,
   ],
 })
 export class AuthModule {}

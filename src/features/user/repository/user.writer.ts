@@ -11,6 +11,7 @@ import {
   NicknameTakenError,
   UserAlreadyRegisteredError,
 } from '../domain/user.error';
+import { DrizzleQueryError } from 'drizzle-orm';
 
 @Injectable()
 export class UserWriter {
@@ -26,11 +27,11 @@ export class UserWriter {
         nickname: user.nickname,
       });
     } catch (e) {
-      if (e instanceof DatabaseError && e.code === '23505') {
-        //unique
-        if (e.constraint === UNIQUE_USERS_NICKNAME)
+      const cause = e instanceof DrizzleQueryError ? e.cause : e;
+      if (cause instanceof DatabaseError && cause.code === '23505') {
+        if (cause.constraint === UNIQUE_USERS_NICKNAME)
           throw new NicknameTakenError();
-        if (e.constraint === UNIQUE_USERS_PROVIDER_ACCOUNT)
+        if (cause.constraint === UNIQUE_USERS_PROVIDER_ACCOUNT)
           throw new UserAlreadyRegisteredError();
       }
       throw e;

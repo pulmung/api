@@ -4,7 +4,10 @@ import { SignupDto } from './dto/signup.dto';
 import { ZodResponse } from 'nestjs-zod';
 import { AuthTokensDto } from './dto/auth-tokens.dto';
 import { ApiErrors } from '../../../common/swagger/api-errors.decorator';
-import { InvalidSocialTokenError } from '../domain/auth.error';
+import {
+  InvalidRefreshTokenError,
+  InvalidSocialTokenError,
+} from '../domain/auth.error';
 import {
   InvalidNicknameError,
   NicknameTakenError,
@@ -15,12 +18,17 @@ import { type Request } from 'express';
 import { ClientPlatform } from '../domain/client-platform';
 import { LoginDto } from './dto/login.dto';
 import { LoginUserUseCase } from '../application/login-user.usecase';
+import { RefreshSessionUseCase } from '../application/refresh-session.usecase';
+import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { LogoutUseCase } from '../application/logout.usecase';
 
 @Controller('auth')
 export class AuthController {
   constructor(
     private readonly signupUser: SignupUserUseCase,
     private readonly loginUser: LoginUserUseCase,
+    private readonly refreshSession: RefreshSessionUseCase,
+    private readonly logoutUser: LogoutUseCase,
   ) {}
 
   @Post('signup')
@@ -50,6 +58,20 @@ export class AuthController {
       accessToken: dto.accessToken,
       device: this.toDevice(dto, req),
     });
+  }
+
+  @Post('refresh')
+  @HttpCode(200)
+  @ApiErrors(InvalidRefreshTokenError)
+  @ZodResponse({ status: 200, type: AuthTokensDto })
+  async refresh(@Body() dto: RefreshTokenDto) {
+    return this.refreshSession.execute({ refreshToken: dto.refreshToken });
+  }
+
+  @Post('logout')
+  @HttpCode(204)
+  async logout(@Body() dto: RefreshTokenDto) {
+    await this.logoutUser.execute({ refreshToken: dto.refreshToken });
   }
 
   private toDevice(

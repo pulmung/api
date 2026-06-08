@@ -4,7 +4,10 @@ import { SessionWriter } from '../repository/session.writer';
 import { ConfigService } from '@nestjs/config';
 import { Env } from '../../../config/env.validation';
 import { ClientPlatform } from '../domain/client-platform';
-import { createRefreshToken } from '../infrastructure/refresh-token';
+import {
+  createRefreshToken,
+  rotateRefreshToken,
+} from '../infrastructure/refresh-token';
 
 export interface DeviceContext {
   platform: ClientPlatform;
@@ -41,5 +44,11 @@ export class SessionIssuer {
   private refreshExpiry() {
     const days = this.config.get('REFRESH_TOKEN_TTL_DAYS', { infer: true });
     return new Date(Date.now() + days * 86_400_000);
+  }
+
+  async rotate(sessionId: string, userId: string) {
+    const { token, tokenHash } = rotateRefreshToken(sessionId);
+    await this.sessionWriter.rotate(sessionId, tokenHash);
+    return { accessToken: this.jwtIssuer.issue(userId), refreshToken: token };
   }
 }
