@@ -7,6 +7,6 @@ export class InvalidSocialTokenError extends DomainError {
 }
 
 export class InvalidRefreshTokenError extends DomainError {
-  readonly code = 'INVALIDE_REFRESH_TOKEN';
+  readonly code = 'INVALID_REFRESH_TOKEN';
   readonly status = HttpStatus.UNAUTHORIZED;
 }

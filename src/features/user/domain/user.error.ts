@@ -3,7 +3,7 @@ import { DomainError } from '../../../common/errors/domain.error';
 
 export class InvalidNicknameError extends DomainError {
   readonly code = 'INVALID_NICKNAME';
-  readonly status: HttpStatus.UNPROCESSABLE_ENTITY;
+  readonly status = HttpStatus.UNPROCESSABLE_ENTITY;
 }
 
 export class NicknameTakenError extends DomainError {
