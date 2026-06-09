@@ -7,17 +7,18 @@
 
 ## 기술 스택
 
-| 영역       | 선택                     | 버전        | 비고                                          |
-| ---------- | ------------------------ | ----------- | --------------------------------------------- |
-| 런타임     | Node.js                  | 22.x        |                                               |
-| 프레임워크 | NestJS                   | ^11.1       |                                               |
-| 언어       | TypeScript               | ^6.0        | `strict`, `nodenext` 모듈 해석                |
-| 빌드       | SWC (`nest-cli` builder) | —           | `typeCheck: true`로 타입검사 병행             |
-| ORM        | Drizzle ORM              | 1.0.0-rc.3  | `drizzle-orm/node-postgres` (v1.0 RC — RQBv2) |
-| DB         | PostgreSQL               | (확인 필요) |                                               |
-| 검증       | Zod (`zod`)              | ^4.4        | env 검증 + `z.infer` 타입 파생                |
-| ID 생성    | `uuidv7`                 | ^1.2        | 앱 레벨 UUIDv7 생성                           |
-| 테스트     | Vitest                   | ^4.1        | + Supertest(E2E)                              |
+| 영역       | 선택                     | 버전        | 비고                                           |
+| ---------- | ------------------------ | ----------- | ---------------------------------------------- |
+| 런타임     | Node.js                  | 22.x        |                                                |
+| 프레임워크 | NestJS                   | ^11.1       |                                                |
+| 언어       | TypeScript               | ^6.0        | `strict`, `nodenext` 모듈 해석                 |
+| 빌드       | SWC (`nest-cli` builder) | —           | `typeCheck: true`로 타입검사 병행              |
+| ORM        | Drizzle ORM              | 1.0.0-rc.3  | `drizzle-orm/node-postgres` (v1.0 RC — RQBv2)  |
+| DB         | PostgreSQL               | (확인 필요) |                                                |
+| 검증       | Zod (`zod`)              | ^4.4        | env 검증 + `z.infer` 타입 파생                 |
+| ID 생성    | `uuidv7`                 | ^1.2        | 앱 레벨 UUIDv7 생성                            |
+| 테스트     | Vitest                   | ^4.1        | + Supertest(E2E)                               |
+| 로깅       | Pino (nestjs-pino)       | ^10 / ^4.6  | 구조화 JSON · stdout. pino-http 요청 자동 로깅 |
 
 > **방향성**: 새 의존성/패턴 도입 시 "가장 최신 트렌드 + 근거 있는 선택"을 우선한다. 관성으로 굳어진 레거시 컨벤션(예: 모든 문자열 `varchar(255)`)은 의심한다.
 
@@ -129,6 +130,14 @@ src/features/<feature>/
 
 ## 테스트 (test)
 
-> **한 줄 요약: 각 관심사를 "가장 싸게 신뢰를 주는 레벨"에서 테스트한다 — 구조(도메인 응집)가 *어디서* 테스트할지를 결정한다. E2E 백본은 필수, 엣지는 unit으로.**
+> **한 줄 요약: 각 관심사를 "가장 싸게 신뢰를 주는 레벨"에서 테스트한다 — 구조(도메인 응집)가 _어디서_ 테스트할지를 결정한다. E2E 백본은 필수, 엣지는 unit으로.**
 
 📄 **상세는 [docs/testing.md](docs/testing.md)에 있다. 테스트 코드를 작성/추가하기 전에 읽는다.** unit·통합은 `*.spec.ts` **co-location**, E2E는 `test/*.e2e-spec.ts`. 러너는 **Vitest**(globals 미사용, `import`), 외부 API mock은 **MSW**.
+
+---
+
+## 로깅 / 관측가능성 (logging)
+
+> **한 줄 요약: 구조화 JSON 로깅(pino) — "읽을 것만 남긴다"가 아니라 "질의할 수 있게 담는다". 요청 상관관계는 reqId, 자격증명은 redact, dev만 pretty·prod는 stdout JSON. 알림·메트릭·트레이싱은 의도적으로 미룸.**
+
+📄 **상세는 [docs/logging.md](docs/logging.md)에 있다. 로깅 설정(`src/common/logger/logger.config.ts`)·예외 필터 로깅을 만지기 전에 읽는다.**

@@ -5,11 +5,15 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { cleanupOpenApiDoc } from 'nestjs-zod';
 import { AppModule } from './app.module';
 import { Env } from './config/env.validation';
+import { Logger } from 'nestjs-pino';
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    bufferLogs: true,
+  });
 
   const configService = app.get<ConfigService<Env, true>>(ConfigService);
+  app.useLogger(app.get(Logger));
 
   app.set(
     'trust proxy',

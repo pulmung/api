@@ -8,6 +8,7 @@ import { DrizzleModule } from './database/drizzle.module';
 import { AuthModule } from './features/auth/auth.module';
 import { UserModule } from './features/user/user.module';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
+import { loggerModule } from './common/logger/logger.config';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { GlobalExceptionFilter } from './common/filters/global-exception.filter'
       validate: validateEnv,
     }),
     DrizzleModule,
+    loggerModule,
     AuthModule,
     UserModule,
   ],
