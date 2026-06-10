@@ -10,6 +10,30 @@ const envSchema = z.object({
     .default('info'),
   DATABASE_URL: z.url(),
 
+  TRUST_PROXY_HOPS: z.coerce.number().int().default(1),
+
+  CORS_ORIGINS: z
+    .string()
+    .min(1)
+    .transform((s) =>
+      s
+        .split(',')
+        .map((v) => v.trim())
+        .filter(Boolean),
+    )
+    .refine((a) => a.length > 0, 'at least one cors origin required')
+    .refine(
+      (a) =>
+        a.every((o) => {
+          try {
+            return new URL(o).origin === o;
+          } catch {
+            return false;
+          }
+        }),
+      'each CORS origin must be a bare origin (scheme://host[:port], no trailing slash/path)',
+    ),
+
   // ── 소셜 인증 (auth feature) ──
   // 구글 OAuth Client ID 집합. 콤마구분 문자열 → string[]. 웹/Android/iOS 플랫폼별 client_id를 전부 나열.
   GOOGLE_CLIENT_IDS: z
@@ -30,8 +54,6 @@ const envSchema = z.object({
   JWT_ACCESS_EXPIRES_IN: z.string().default('15m'),
 
   REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().min(0).default(30),
-
-  TRUST_PROXY_HOPS: z.coerce.number().int().default(1),
 });
 
 export type Env = z.infer<typeof envSchema>;

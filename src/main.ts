@@ -19,6 +19,13 @@ async function bootstrap() {
     'trust proxy',
     configService.get('TRUST_PROXY_HOPS', { infer: true }),
   );
+  app.enableCors({
+    origin: configService.get('CORS_ORIGINS', { infer: true }),
+    credentials: false,
+    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'PUT', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    maxAge: 600,
+  });
 
   // OpenAPI 스펙을 단일 소스로 노출 → web/mobile codegen 입력.
   // cleanupOpenApiDoc: nestjs-zod 가 생성한 스키마를 OpenAPI 규격으로 후처리(필수).
