@@ -23,7 +23,7 @@
     "db:studio": "drizzle-kit studio",
     "db:pull": "drizzle-kit pull",
     "openapi:check": "npm run openapi:generate && git diff --exit-code openapi.json",
-    "openapi:generate": "tsx scripts/generate-openapi.ts"
+    "openapi:generate": "node -r @swc-node/register scripts/generate-openapi.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.24",
@@ -48,6 +48,7 @@
     "@eslint/js": "^9.18.0",
     "@nestjs/cli": "^11.0.21",
     "@nestjs/testing": "^11.1.24",
+    "@swc-node/register": "^1.11.1",
     "@swc/cli": "^0.8.1",
     "@swc/core": "^1.15.40",
     "@testcontainers/postgresql": "^12.0.1",

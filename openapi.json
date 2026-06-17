@@ -19,6 +19,16 @@
       "post": {
         "operationId": "AuthController_signup",
         "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignupDto"
+              }
+            }
+          }
+        },
         "responses": {
           "201": {
             "description": "회원가입",
@@ -131,6 +141,16 @@
       "post": {
         "operationId": "AuthController_login",
         "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginDto"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "",
@@ -212,6 +232,16 @@
       "post": {
         "operationId": "AuthController_refresh",
         "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshTokenDto"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "",
@@ -263,6 +293,16 @@
       "post": {
         "operationId": "AuthController_logout",
         "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshTokenDto"
+              }
+            }
+          }
+        },
         "responses": {
           "204": {
             "description": ""
@@ -284,6 +324,44 @@
   "servers": [],
   "components": {
     "schemas": {
+      "SignupDto": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string",
+            "enum": [
+              "kakao",
+              "google"
+            ]
+          },
+          "accessToken": {
+            "type": "string",
+            "minLength": 1
+          },
+          "nickname": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 20
+          },
+          "platform": {
+            "type": "string",
+            "enum": [
+              "web",
+              "ios",
+              "android"
+            ]
+          },
+          "deviceName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider",
+          "accessToken",
+          "nickname",
+          "platform"
+        ]
+      },
       "AuthTokensDto_Output": {
         "type": "object",
         "properties": {
@@ -299,6 +377,50 @@
           "refreshToken"
         ],
         "additionalProperties": false
+      },
+      "LoginDto": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string",
+            "enum": [
+              "kakao",
+              "google"
+            ]
+          },
+          "accessToken": {
+            "type": "string",
+            "minLength": 1
+          },
+          "platform": {
+            "type": "string",
+            "enum": [
+              "web",
+              "ios",
+              "android"
+            ]
+          },
+          "deviceName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider",
+          "accessToken",
+          "platform"
+        ]
+      },
+      "RefreshTokenDto": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "refreshToken"
+        ]
       }
     }
   }
