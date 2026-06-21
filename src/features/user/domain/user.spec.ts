@@ -7,7 +7,7 @@ describe('User.register', () => {
     provider: 'kakao' as const,
     providerUserId: '12345',
     email: 'user@kakao.com',
-    nickname: '식집사',
+    nickname: '풀멍',
   };
 
   it('유효한 입력으로 필드를 보존해 User를 생성한다', () => {
@@ -15,7 +15,7 @@ describe('User.register', () => {
     expect(user.provider).toBe('kakao');
     expect(user.providerUserId).toBe('12345');
     expect(user.email).toBe('user@kakao.com');
-    expect(user.nickname).toBe('식집사');
+    expect(user.nickname).toBe('풀멍');
   });
 
   it('id를 자동으로 생성한다 (uuid 형식)', () => {
@@ -28,8 +28,8 @@ describe('User.register', () => {
   });
 
   it('닉네임 앞뒤 공백을 제거한다', () => {
-    expect(User.register({ ...valid, nickname: '   식집사   ' }).nickname).toBe(
-      '식집사',
+    expect(User.register({ ...valid, nickname: '   풀멍   ' }).nickname).toBe(
+      '풀멍',
     );
   });
 

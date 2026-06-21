@@ -38,7 +38,7 @@ describe('Auth (e2e)', () => {
   };
 
   // 가입 = 토큰 발급. 테스트용 유저 1명 만들고 refreshToken 반환.
-  const register = async (accessToken = 'user-1', nickname = '식집사') => {
+  const register = async (accessToken = 'user-1', nickname = '풀멍') => {
     const { body } = await post('/auth/signup', {
       ...base,
       accessToken,
@@ -54,7 +54,7 @@ describe('Auth (e2e)', () => {
       const { status, body } = await post('/auth/signup', {
         ...base,
         accessToken: 'user-1',
-        nickname: '식집사',
+        nickname: '풀멍',
       });
       expect(status).toBe(201);
       expect(body.accessToken).toBeDefined();
@@ -62,7 +62,7 @@ describe('Auth (e2e)', () => {
     });
 
     it('409: 이미 가입된 소셜 계정', async () => {
-      await register('user-1', '식집사');
+      await register('user-1', '풀멍');
       const { status, body } = await post('/auth/signup', {
         ...base,
         accessToken: 'user-1',
@@ -73,11 +73,11 @@ describe('Auth (e2e)', () => {
     });
 
     it('409: 닉네임 중복', async () => {
-      await register('user-1', '식집사');
+      await register('user-1', '풀멍');
       const { status, body } = await post('/auth/signup', {
         ...base,
         accessToken: 'user-2',
-        nickname: '식집사',
+        nickname: '풀멍',
       });
 
       expect(status).toBe(409);
@@ -96,7 +96,7 @@ describe('Auth (e2e)', () => {
 
   describe('POST /auth/login', () => {
     it('200: 가입된 유저 -> 토큰 발급', async () => {
-      await register('user-1', '식집사');
+      await register('user-1', '풀멍');
       const { status, body } = await post('/auth/login', {
         ...base,
         accessToken: 'user-1',
