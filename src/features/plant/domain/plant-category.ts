@@ -5,9 +5,11 @@ export const plantCategories = [
   '관엽',
   '다육',
   '선인장',
+  '괴근',
   '난초',
   '허브',
   '식충',
+  '수생',
 ] as const;
 
 export type PlantCategory = (typeof plantCategories)[number];
