@@ -18,6 +18,9 @@ import { LogoutUseCase } from './application/logout.usecase';
   imports: [
     UserModule,
     JwtModule.registerAsync({
+      // @Authenticated/@OptionalAuth 가 다른 모듈의 라우트에서 JwtAuthGuard 를
+      // UseGuards 로 붙이므로, JwtService 를 전역으로 노출해 어디서든 resolve 되게 한다.
+      global: true,
       inject: [ConfigService],
       useFactory: (config: ConfigService<Env, true>) => ({
         secret: config.get('JWT_ACCESS_SECRET', { infer: true }),

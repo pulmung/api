@@ -126,9 +126,22 @@ features/<feature>/
 
 ## 10. 토큰 / 보안
 
+**발급**
+
 - JWT payload는 **최소**(`{ sub: user.id }`). 자주 변하는 것(닉네임)·민감정보 금지(base64라 디코드된다).
-- `secret`·`expiresIn`은 `JwtModule.registerAsync`에 한 번 설정, `sign`은 payload만.
+- `secret`·`expiresIn`은 `JwtModule.registerAsync`에 한 번 설정, `sign`은 payload만. `JwtModule`은 **`global: true`** — 가드가 다른 feature 모듈의 라우트에서 `UseGuards`로 붙으므로 `JwtService`가 어디서든 resolve돼야 한다.
 - 클라가 보낸 신원 불신 — 검증된 값(`identity`)만 진실로 사용([social-auth.md](social-auth.md)).
+
+**검증 (access token 가드)** — `JwtAuthGuard`(`features/auth/infrastructure/`)가 발급의 역.
+
+- **무상태 검증**: 서명 + 만료 + **알고리즘 고정(`algorithms: ['HS256']`)** 만 확인하고 `sub`를 신뢰 → `req.user = { id }`. 매 요청 DB 조회 없음(폐기/밴은 refresh 경계의 DB 세션이 책임 — access는 짧게 산다). 실패는 형태 불문 **단일 `UnauthenticatedError`(401)** 로 통일(만료/위조 구분 안 함 = oracle 회피). `sub`가 문자열이 아니면 거부.
+- **가드는 opt-in — 전역 `APP_GUARD`가 아니다**(§13). 라우트에 데코레이터로 붙인다(`features/auth/presentation/`):
+  - `@Authenticated()` = `UseGuards(JwtAuthGuard)` + `@ApiBearerAuth()` + `@ApiErrors(UnauthenticatedError)` 합성 → **가드(enforcement) + OpenAPI 문서**를 한 데코로. 보호 라우트에.
+  - `@OptionalAuth()` = 위 + `SetMetadata(IS_OPTIONAL_AUTH_KEY)` → 토큰 없으면 익명 통과, 있으면 검증(잘못됐으면 401).
+  - **공개 라우트 = 무표시**(데코 0). → 라우트당 데코 하나, 공개는 clean, 이중 애노테이션 0.
+- **왜 opt-in인가**: 전역 가드(secure-by-default)면 ① 공개마다 `@Public` opt-out + 보호마다 문서용 데코 = **이중 애노테이션**, ② 보호가 컨트롤러에 안 보이는 **암묵 동작**이 생긴다(명시 > 마법). 인증은 라우트마다 공개/보호/선택이 갈리는 **라우트 단위 결정**이라 opt-in.
+  - ⚠️ **트레이드오프**: opt-in은 `@Authenticated` 누락 시 **fail-open**(전역 가드는 fail-closed). "의도치 않게 열린 라우트 없음" 불변식을 **리뷰 + (라우트가 늘면) allowlist 테스트**로 지킨다 — 전역 가드가 *구조로* 준다면 opt-in은 *테스트로* 준다.
+- `@CurrentUser()`(`common/auth/`, `AuthUser` 타입 공유)로 컨트롤러가 `req.user`를 타입 안전하게 꺼낸다. 공개/optional 라우트에선 `undefined` 가능 → 반환 타입 `AuthUser | undefined`.
 
 ---
 
@@ -164,3 +177,4 @@ features/<feature>/
 - **에러 OpenAPI 문서화**: 글로벌 필터의 응답은 정적 분석이 안 되므로, 엔드포인트가 던지는 도메인 예외를 `@ApiErrors(...예외클래스)`(`common/swagger/`)로 선언 → status별 `errorCode` enum이 스펙에 박혀 codegen으로 프론트에 전달된다. **엔드포인트별 응답 클래스를 손으로 만들지 않는다**(보일러플레이트 회피).
 - 글로벌 등록 위치는 `app.module`의 `providers`. OpenAPI 스펙 노출(codegen 단일 소스)은 `main.ts`의 Swagger 설정이며, 글로벌 직렬화와 별개다.
 - 횡단으로 올릴지 feature 로컬에 둘지 기준: **앱 전체에 일관 적용돼야 하면 글로벌**(`APP_*`), 특정 라우트에만 필요하면 데코레이터/로컬. (검증·직렬화·도메인예외 매핑은 전자.)
+- **인증(auth) 가드는 이 표에 없다 — 의도적으로 opt-in**이다. 위 3개(검증·직렬화·예외매핑)는 앱 전체에 일관 적용돼야 해서 글로벌이지만, **인증은 라우트마다 공개/보호/선택이 갈리는 라우트 단위 결정**이라 `@Authenticated()`/`@OptionalAuth()` 데코레이터로 붙인다. 전역 `APP_GUARD`로 올리지 않는다(이유·트레이드오프는 §10).

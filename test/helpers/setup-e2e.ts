@@ -1,3 +1,4 @@
+import { Type } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { PostgreSqlContainer } from '@testcontainers/postgresql';
 import { drizzle } from 'drizzle-orm/node-postgres';
@@ -7,7 +8,7 @@ import { SocialIdentityVerifier } from '../../src/features/auth/infrastructure/s
 import { AppModule } from '../../src/app.module';
 import { DRIZZLE } from '../../src/database/drizzle.constants';
 
-export async function setupE2E() {
+export async function setupE2E(extraControllers: Type[] = []) {
   const container = await new PostgreSqlContainer('postgres:18.4').start();
 
   // ConfigModule 검증 통과용 테스트 env
@@ -32,7 +33,10 @@ export async function setupE2E() {
       }),
   };
 
-  const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+  const moduleRef = await Test.createTestingModule({
+    imports: [AppModule],
+    controllers: extraControllers,
+  })
     .overrideProvider(DRIZZLE)
     .useValue(testDb)
     .overrideProvider(SocialIdentityVerifier)

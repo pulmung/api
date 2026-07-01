@@ -9,6 +9,7 @@ export function createOpenApiDocument(app: INestApplication) {
       .setTitle('pulmung API')
       .setVersion('1.0')
       .setOpenAPIVersion('3.1.0')
+      .addBearerAuth()
       .build(),
   );
 
