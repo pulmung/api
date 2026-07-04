@@ -109,7 +109,7 @@ testing.md의 "가장 싸게 신뢰를 주는 레벨" 적용:
 
 | seam                            | 언제/어디서                                                                 |
 | ------------------------------- | --------------------------------------------------------------------------- |
-| 첨부 시점 `head()` 검증 + images jsonb | plant feature — `plants.images`는 단일 jsonb(배열 of `{key, width?, ...}`) 권장 |
+| 첨부 시점 `head()` 검증 + images jsonb | ✅ 구현됨 (`features/plant` 생성 usecase) — `plants.images` = 단일 jsonb(배열 of `{key, width?, height?}`). 다음 소비처(chat 등)도 같은 패턴 |
 | 이미지 치수                      | 클라 제공값 = 신뢰 불가 힌트(피드 CLS 방지용으론 충분). 진짜 치수는 추후 S3 이벤트→Lambda |
 | 고아 파일 정리                   | S3 lifecycle 규칙 (원장 테이블이 없으니 DB 스윕 없음)                          |
 | 원본 파일명 복원(채팅 다운로드)   | 메타를 message jsonb에 + presigned GET `ResponseContentDisposition`            |
