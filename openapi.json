@@ -312,6 +312,103 @@
           "Auth"
         ]
       }
+    },
+    "/files": {
+      "post": {
+        "operationId": "FileController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateFileUploadDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "파일 업로드 presign 발급 (클라이언트가 S3로 직접 업로드)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileUploadTargetDto_Output"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "statusCode",
+                    "errorCode",
+                    "message"
+                  ],
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "example": 401
+                    },
+                    "errorCode": {
+                      "type": "string",
+                      "enum": [
+                        "UNAUTHENTICATED"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "statusCode",
+                    "errorCode",
+                    "message"
+                  ],
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "example": 422
+                    },
+                    "errorCode": {
+                      "type": "string",
+                      "enum": [
+                        "UNSUPPORTED_FILE_TYPE",
+                        "FILE_TOO_LARGE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "File"
+        ]
+      }
     }
   },
   "info": {
@@ -323,6 +420,13 @@
   "tags": [],
   "servers": [],
   "components": {
+    "securitySchemes": {
+      "bearer": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http"
+      }
+    },
     "schemas": {
       "SignupDto": {
         "type": "object",
@@ -421,6 +525,78 @@
         "required": [
           "refreshToken"
         ]
+      },
+      "CreateFileUploadDto": {
+        "type": "object",
+        "properties": {
+          "purpose": {
+            "type": "string",
+            "enum": [
+              "plant-image"
+            ]
+          },
+          "contentType": {
+            "type": "string",
+            "minLength": 1,
+            "example": "image/jpeg"
+          },
+          "size": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "purpose",
+          "contentType"
+        ]
+      },
+      "FileUploadTargetDto_Output": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "업로드 후 도메인 리소스 생성 요청(예: 식물 등록)에 첨부할 불투명 key",
+            "example": "plant-image/0198c5b2-2f74-7abc-8def-0123456789ab.jpg"
+          },
+          "upload": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string",
+                "format": "uri",
+                "description": "S3 presigned POST 대상 URL"
+              },
+              "fields": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "description": "POST form에 그대로 실어야 하는 서명 필드들"
+              },
+              "expiresAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                "description": "presign 만료 시각"
+              }
+            },
+            "required": [
+              "url",
+              "fields",
+              "expiresAt"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "key",
+          "upload"
+        ],
+        "additionalProperties": false
       }
     }
   }

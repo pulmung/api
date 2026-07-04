@@ -54,6 +54,13 @@ const envSchema = z.object({
   JWT_ACCESS_EXPIRES_IN: z.string().default('15m'),
 
   REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().min(0).default(30),
+
+  // ── 파일 업로드 (file feature) ──
+  // AWS 자격증명 키는 스키마에 두지 않는다 — default credential chain 사용(prod IAM role / 로컬 profile).
+  AWS_REGION: z.string().min(1),
+  // 접근등급별 버킷 분리 — public(CloudFront OAC, unsigned) 파일용 버킷.
+  // seam: private 파일(채팅)은 S3_PRIVATE_FILE_BUCKET + CloudFront signed URL 키를 chat feature 때 추가.
+  S3_PUBLIC_FILE_BUCKET: z.string().min(1),
 });
 
 export type Env = z.infer<typeof envSchema>;

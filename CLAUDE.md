@@ -141,3 +141,11 @@ src/features/<feature>/
 > **한 줄 요약: 구조화 JSON 로깅(pino) — "읽을 것만 남긴다"가 아니라 "질의할 수 있게 담는다". 요청 상관관계는 reqId, 자격증명은 redact, dev만 pretty·prod는 stdout JSON. 알림·메트릭·트레이싱은 의도적으로 미룸.**
 
 📄 **상세는 [docs/logging.md](docs/logging.md)에 있다. 로깅 설정(`src/common/logger/logger.config.ts`)·예외 필터 로깅을 만지기 전에 읽는다.**
+
+---
+
+## 파일 업로드 (file)
+
+> **한 줄 요약: stateless presign — files 원장 테이블 없이(의도적 폐기, 되살리지 말 것) S3 presigned POST의 policy가 업로드 시점에 크기·타입·키를 강제하고, 파일 메타는 소비처 도메인 jsonb에 인라인. 버킷은 접근등급별 분리, CloudFront signed URL은 읽기 경로 전용.**
+
+📄 **상세(확정 결정·버킷 전략·private 확장 계획·seam 목록)는 [docs/file-upload.md](docs/file-upload.md)에 있다. `features/file` 코드 또는 파일을 첨부받는 소비처 feature(plant·chat 등)를 만지기 전에 반드시 읽는다.**
