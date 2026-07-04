@@ -8,6 +8,7 @@ import { DrizzleModule } from './database/drizzle.module';
 import { AuthModule } from './features/auth/auth.module';
 import { UserModule } from './features/user/user.module';
 import { FileModule } from './features/file/file.module';
+import { PlantModule } from './features/plant/plant.module';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { loggerModule } from './common/logger/logger.config';
 
@@ -22,6 +23,7 @@ import { loggerModule } from './common/logger/logger.config';
     AuthModule,
     UserModule,
     FileModule,
+    PlantModule,
   ],
   controllers: [AppController],
   providers: [

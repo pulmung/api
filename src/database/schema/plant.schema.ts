@@ -1,8 +1,16 @@
-import { uuid, text, timestamp, index, primaryKey } from 'drizzle-orm/pg-core';
+import {
+  uuid,
+  text,
+  timestamp,
+  index,
+  primaryKey,
+  jsonb,
+} from 'drizzle-orm/pg-core';
 import { uuidv7 } from 'uuidv7';
 import { pgTable } from './table';
 import { users } from './user.schema';
 import { plantCategories } from '../../features/plant/domain/plant-category';
+import type { PlantImage } from '../../features/plant/domain/plant-image';
 
 export const PK_SPECIES = 'pk_species';
 export const UNIQUE_PLANTS_NAME = 'uq_plants_name';
@@ -50,10 +58,10 @@ export const plants = pgTable(
       .$defaultFn(() => uuidv7()),
     // 식물을 구분짓는 유일한 속성. 전역 유니크 → 중복 등록 금지(공유 카탈로그).
     name: text().notNull().unique(UNIQUE_PLANTS_NAME),
-    // 이미지(필수, 여러 장). 객체 스토리지 URL/key 배열. 첫 요소 = 대표/커버.
-    // "최소 1장"은 자기완결 불변식이라 DB가 아니라 도메인 엔티티 + Zod 경계에서 강제한다(§6).
-    // (text[]의 notNull은 NULL만 막고 빈 배열 `{}`은 통과하므로 앱이 ≥1을 보장.)
-    images: text().array().notNull(),
+    // 이미지(필수, ≥1) — 단일 jsonb, 배열 of {key, width?, height?}. 첫 요소 = 대표/커버.
+    // 저장은 불투명 key만(전체 URL 금지 — 버킷/CDN 이전 안전). 실존 검증(head)은 생성
+    // usecase가, "최소 1장"·형식은 도메인 엔티티 + Zod 경계가 강제한다(docs/file-upload.md §6).
+    images: jsonb().$type<PlantImage[]>().notNull(),
 
     // ── 메타데이터(옵셔널) ──────────────────────────
     // 속·종은 자유 텍스트(FK 없음). 셀렉트박스 선택지는 genera/species 사전(admin+seed)에서

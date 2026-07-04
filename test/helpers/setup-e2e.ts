@@ -9,6 +9,13 @@ import { S3FileStorage } from '../../src/features/file/infrastructure/s3-file.st
 import { AppModule } from '../../src/app.module';
 import { DRIZZLE } from '../../src/database/drizzle.constants';
 
+export type FakeFileStorage = Pick<
+  S3FileStorage,
+  'createUploadTarget' | 'head'
+> & {
+  missingKeys: Set<string>;
+};
+
 export async function setupE2E(extraControllers: Type[] = []) {
   const container = await new PostgreSqlContainer('postgres:18.4').start();
 
@@ -37,7 +44,9 @@ export async function setupE2E(extraControllers: Type[] = []) {
   };
 
   // real S3Client 미생성 → E2E에 AWS 자격증명 불필요
-  const fakeStorage: Pick<S3FileStorage, 'createUploadTarget'> = {
+  // head 기본값 = "존재" (해피패스 무설정) — missingKeys에 넣은 key만 미업로드 시뮬레이션.
+  const missingKeys = new Set<string>();
+  const fakeStorage: FakeFileStorage = {
     createUploadTarget: ({ key, contentType }) =>
       Promise.resolve({
         url: 'https://test-bucket.s3.ap-northeast-2.amazonaws.com/',
@@ -49,6 +58,9 @@ export async function setupE2E(extraControllers: Type[] = []) {
         },
         expiresAt: new Date(Date.now() + 300_000).toISOString(),
       }),
+    head: (key) =>
+      Promise.resolve(missingKeys.has(key) ? null : { size: 1234 }),
+    missingKeys,
   };
 
   const moduleRef = await Test.createTestingModule({
@@ -66,5 +78,5 @@ export async function setupE2E(extraControllers: Type[] = []) {
   const app = moduleRef.createNestApplication();
   await app.init();
 
-  return { app, container, db: testDb, pool };
+  return { app, container, db: testDb, pool, fakeStorage };
 }
