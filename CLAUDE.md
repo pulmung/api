@@ -43,6 +43,7 @@ npx drizzle-kit generate # 스키마 변경 → 마이그레이션 SQL 생성
 npx drizzle-kit migrate  # 마이그레이션 적용
 npx drizzle-kit push     # 프로토타이핑용 직접 반영 (운영 X)
 npx drizzle-kit studio   # GUI
+npm run db:seed          # 사전(genera/species) 시드 — insert-only 멱등, 재실행 안전
 ```
 
 ---
@@ -56,6 +57,10 @@ src/database/
   schema/
     user.schema.ts        # 도메인별 테이블 정의
     index.ts              # barrel: 모든 스키마 re-export (drizzle()에 전달)
+  seed/                   # reference data 시드 (데이터 = 코드, PR로 큐레이션)
+    plant-dictionary.data.ts   # 속/종 사전 스타터 데이터
+    plant-dictionary.seed.ts   # apply 함수 (insert-only 멱등, 자기 트랜잭션)
+    run.ts                # 엔트리 — dev: tsx / prod: node dist/database/seed/run.js
   drizzle.constants.ts    # 주입 토큰(DRIZZLE) + DB 타입(DrizzleDB)
   drizzle.module.ts       # @Global 모듈, pg.Pool 기반 커넥션 제공
 drizzle.config.ts         # (루트) drizzle-kit CLI 설정
@@ -111,6 +116,11 @@ src/features/<feature>/
 | 시각   | `timestamp({ withTimezone: true })`              | `timestamptz`. UTC 시점 저장 → 타임존 모호성 제거. (`timestamp` without tz 금지)         |
 
 - `$defaultFn`(앱 생성)은 **Drizzle ORM 경로(`db.insert`)로 넣을 때만** 동작한다. raw SQL INSERT는 ID가 안 채워지니 앱 경유 삽입을 전제로 한다.
+
+### 시드 (reference data)
+
+- 큐레이션 사전(genera/species 등)은 **마이그레이션·부팅 훅이 아니라 독립 스크립트**(`src/database/seed/`)로 넣는다. 데이터는 TS 파일 = 코드(PR 리뷰), `npm run db:seed`.
+- **insert-only 멱등**(`onConflictDoNothing`, 단일 트랜잭션): 재실행 = 누락분만 추가. update/delete 안 함 — admin이 테이블을 공동 소유하게 되므로. ⚠️ admin이 지운 baseline 행은 재시드 시 부활(admin 도입 전까지 수용).
 
 ### 타입
 

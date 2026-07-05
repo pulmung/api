@@ -22,6 +22,7 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "db:pull": "drizzle-kit pull",
+    "db:seed": "tsx src/database/seed/run.ts",
     "openapi:check": "npm run openapi:generate && git diff --exit-code openapi.json",
     "openapi:generate": "node -r @swc-node/register scripts/generate-openapi.ts"
   },
