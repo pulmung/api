@@ -537,6 +537,61 @@
           "Plant"
         ]
       }
+    },
+    "/genera": {
+      "get": {
+        "operationId": "GeneraController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "속(genus) 사전 — 식물 등록 셀렉트박스 선택지 (이름 가나다순)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GeneraDto_Output"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Genera"
+        ]
+      }
+    },
+    "/species": {
+      "get": {
+        "operationId": "SpeciesController_list",
+        "parameters": [
+          {
+            "name": "genus",
+            "required": true,
+            "in": "query",
+            "description": "속 이름(정확 일치 필터) — 미등록 속이면 빈 배열",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 100,
+              "example": "몬스테라",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "종(species) 사전 — 선택한 속의 종만 (이름 가나다순, 미등록 속은 빈 배열)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpeciesDto_Output"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Species"
+        ]
+      }
     }
   },
   "info": {
@@ -726,6 +781,19 @@
         ],
         "additionalProperties": false
       },
+      "CreatePlantDtoPlantCategory": {
+        "type": "string",
+        "enum": [
+          "관엽",
+          "다육",
+          "선인장",
+          "괴근",
+          "난초",
+          "허브",
+          "식충",
+          "수생"
+        ]
+      },
       "CreatePlantDto": {
         "type": "object",
         "properties": {
@@ -765,36 +833,40 @@
           },
           "genus": {
             "description": "속 — 자유 텍스트(genera 사전은 제안 소스일 뿐)",
-            "example": "Monstera",
+            "example": "몬스테라",
             "type": "string",
             "minLength": 1,
             "maxLength": 100
           },
           "species": {
             "description": "종 — 자유 텍스트",
-            "example": "deliciosa",
+            "example": "델리시오사",
             "type": "string",
             "minLength": 1,
             "maxLength": 100
           },
           "category": {
-            "type": "string",
-            "enum": [
-              "관엽",
-              "다육",
-              "선인장",
-              "괴근",
-              "난초",
-              "허브",
-              "식충",
-              "수생"
-            ]
+            "$ref": "#/components/schemas/CreatePlantDtoPlantCategory"
           }
         },
         "required": [
           "name",
           "images"
         ]
+      },
+      "PlantCategory_Output": {
+        "type": "string",
+        "enum": [
+          "관엽",
+          "다육",
+          "선인장",
+          "괴근",
+          "난초",
+          "허브",
+          "식충",
+          "수생"
+        ],
+        "id": "PlantCategory_Output"
       },
       "PlantDto_Output": {
         "type": "object",
@@ -855,17 +927,7 @@
           "category": {
             "anyOf": [
               {
-                "type": "string",
-                "enum": [
-                  "관엽",
-                  "다육",
-                  "선인장",
-                  "괴근",
-                  "난초",
-                  "허브",
-                  "식충",
-                  "수생"
-                ]
+                "$ref": "#/components/schemas/PlantCategory_Output"
               },
               {
                 "type": "null"
@@ -886,6 +948,44 @@
           "species",
           "category",
           "createdAt"
+        ],
+        "additionalProperties": false
+      },
+      "GeneraDto_Output": {
+        "type": "object",
+        "properties": {
+          "genera": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "몬스테라",
+              "필로덴드론"
+            ]
+          }
+        },
+        "required": [
+          "genera"
+        ],
+        "additionalProperties": false
+      },
+      "SpeciesDto_Output": {
+        "type": "object",
+        "properties": {
+          "species": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "델리시오사",
+              "아단소니"
+            ]
+          }
+        },
+        "required": [
+          "species"
         ],
         "additionalProperties": false
       }

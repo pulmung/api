@@ -1,6 +1,6 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
-import { plantCategories } from '../../domain/plant-category';
+import { PlantCategorySchema } from './plant-category.schema';
 
 const PlantSchema = z.object({
   id: z.uuid(),
@@ -15,7 +15,7 @@ const PlantSchema = z.object({
   ),
   genus: z.string().nullable(),
   species: z.string().nullable(),
-  category: z.enum(plantCategories).nullable(),
+  category: PlantCategorySchema.nullable(),
   createdAt: z.iso.datetime(),
 });
 

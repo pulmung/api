@@ -1,6 +1,6 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
-import { plantCategories } from '../../domain/plant-category';
+import { PlantCategorySchema } from './plant-category.schema';
 import { PLANT_IMAGES_MAX, PLANT_NAME_MAX_LENGTH } from '../../domain/plant';
 
 const CreatePlantSchema = z.object({
@@ -33,7 +33,7 @@ const CreatePlantSchema = z.object({
     description: '종 — 자유 텍스트',
     example: '델리시오사',
   }),
-  category: z.enum(plantCategories).optional(),
+  category: PlantCategorySchema.optional(),
 });
 
 export class CreatePlantDto extends createZodDto(CreatePlantSchema) {}
