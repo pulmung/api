@@ -1,8 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import {
-  PostgreSqlContainer,
-  StartedPostgreSqlContainer,
-} from '@testcontainers/postgresql';
+import { StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { and, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
@@ -11,6 +8,7 @@ import { DrizzleDB } from '../src/database/drizzle.constants';
 import { genera, species } from '../src/database/schema';
 import { plantDictionaryData } from '../src/database/seed/plant-dictionary.data';
 import { seedPlantDictionary } from '../src/database/seed/plant-dictionary.seed';
+import { createPostgresContainer } from './helpers/setup-e2e';
 
 // HTTP 없는 스크립트 테스트지만 docker(testcontainers)가 필요해서 e2e 프로젝트에 편입.
 // setupE2E는 안 쓴다 — Nest 앱이 불필요(컨테이너 + 마이그레이션 + 시드 함수 직접 호출).
@@ -28,7 +26,7 @@ describe('PlantDictionary seed (e2e)', () => {
   });
 
   beforeAll(async () => {
-    container = await new PostgreSqlContainer('postgres:18.4').start();
+    container = await createPostgresContainer().start();
     pool = new Pool({ connectionString: container.getConnectionUri() });
     db = drizzle({ client: pool });
     await migrate(db, { migrationsFolder: './drizzle' });

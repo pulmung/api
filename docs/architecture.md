@@ -5,7 +5,7 @@
 
 > **한 줄 요약: feature-first + 헥사고날 변형 + CQRS(개념). 의존은 항상 안쪽으로, 추상화는 관성이 아니라 매번 "값"을 계산해서 도입한다.**
 
-> **참조 구현**: `features/auth` + `features/user` (소셜 회원가입 `POST /auth/signup`).
+> **참조 구현**: 쓰기 — `features/auth` + `features/user` (소셜 회원가입 `POST /auth/signup`) / 읽기 — `features/plant` 사전 조회 (`GET /genera` · `GET /species?genus=`).
 
 > ⚠️ **이 문서는 모든 feature·리소스에 적용되는 *일반 컨벤션*이다.** `auth`/`user`는 원칙이 처음 구현된 **참조 예시**일 뿐 — 앞으로 추가될 리소스(`post`·`comment`·`commerce`…)도 동일 원칙을 따른다. 본문의 특정 클래스·필드명(`User`, `VerifiedIdentity`, `socialProviders` 등)과 `예:` 표기는 **현재 구현 예시**이지 규칙이 아니다. 규칙은 그 위의 리소스-중립적 서술이다.
 
@@ -43,6 +43,7 @@ presentation → application → domain ← (repository | infrastructure)
 - "읽기와 쓰기는 다른 모델을 써도 된다"만 채택. **`@nestjs/cqrs`(CommandBus) 미도입** — 이벤트소싱/비동기 분리가 필요할 때까지 YAGNI.
 - **쓰기**: 도메인을 거친다. UseCase = Command 핸들러(`XxxUseCase.execute`). 도메인 엔티티 → `writer`.
 - **읽기**: 도메인을 우회한다. `reader`가 DB → 전용 DTO 직빵(부분 select 자유).
+  - 읽기 **참조 구현**: `features/plant` 사전 조회(`GET /genera`·`GET /species?genus=`) — controller → reader 직행(유스케이스 없음), 쿼리 DTO(`@Query() dto`, 글로벌 파이프가 검증), 공개 라우트(무표시), reference-data엔 `Cache-Control`(public + max-age + stale-while-revalidate).
 - UseCase **1개 = 1 클래스 + `execute`** (동작마다 의존이 다를 때). 의존이 거의 같으면 한 서비스로 묶어도 됨 — 기준은 **의존 응집도**이지 규칙이 아니다.
 
 ---
@@ -120,6 +121,8 @@ features/<feature>/
 - **응답 공유 기준 = "변경 이유가 같은가"**. 같으면 공유(`AuthTokensDto`를 login/signup/refresh가), 다르면 분리.
 - 모듈 간 응답 중첩 회피 → 순환 방지장치(`base.response`)가 애초에 불필요. 각 DTO는 자기 endpoint의 계약(optional 떡칠 만능 DTO 금지 = 거짓말 금지).
 - nestjs-zod: 요청 `createZodDto` + 글로벌 `ZodValidationPipe`. 응답 **`@ZodResponse`**(직렬화 + OpenAPI 문서 + 컴파일 반환검증, 공식 권장 / `@ZodSerializerDto`보다 우위). 문서화는 `.meta({ description, example })` / `.describe()`.
+- **셀렉트박스/상수 목록의 공급 기준 = "변경이 어느 배포 트레인을 타는가"**: 코드 배포와 함께만 변하는 **닫힌 enum**(예: `plantCategories`)은 런타임 API를 만들지 않는다 — 스펙의 enum → codegen으로 전달. 운영 중 배포 없이 변하는 **열린 사전**(예: genera/species, admin 큐레이션)은 reference-data 조회 API로 전달. 사용처 개수는 판단 축이 아니다.
+- **여러 DTO가 공유하는 enum은 named component로**: 공유 zod 스키마 **단일 인스턴스**에 `.meta({ id: 'XxxYyy' })` → `cleanupOpenApiDoc`이 `components.schemas`로 호이스팅하고 사용처를 `$ref`로 바꾼다. DTO마다 `z.enum(...)`을 따로 만들면 스펙에 인라인 복제 → codegen이 익명 타입을 여러 개 생성. ⚠️ `.meta({ id })` 인스턴스가 둘이면 duplicate-id 에러 — 반드시 한 파일에서 export해 재사용. (참조 구현: `features/plant/presentation/dto/plant-category.schema.ts` — zod ≥4.4 × nestjs-zod 5.4의 input 쪽 리네임 드리프트 주석 포함.)
 - `additionalProperties: false`("forbidden")는 **정상이자 자산** — 정확한 계약 + 누출 방지 + codegen 정확성. 유지.
 
 ---

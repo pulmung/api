@@ -44,7 +44,13 @@ npx drizzle-kit migrate  # 마이그레이션 적용
 npx drizzle-kit push     # 프로토타이핑용 직접 반영 (운영 X)
 npx drizzle-kit studio   # GUI
 npm run db:seed          # 사전(genera/species) 시드 — insert-only 멱등, 재실행 안전
+
+# OpenAPI (codegen 단일 소스)
+npm run openapi:generate # openapi.json 재생성
+npm run openapi:check    # 생성 + git diff로 드리프트 검출 (CI용)
 ```
+
+> ⚠️ **DTO·컨트롤러·`@ApiErrors`를 바꿨으면 `openapi:generate`를 재실행해 openapi.json을 같은 커밋에 포함한다.** 스펙이 낡은 채 커밋되면 프론트 codegen이 낡은 계약을 받는다 (실제 사고 사례: 3e655e1 — example 변경 후 미재생성).
 
 ---
 
@@ -116,6 +122,18 @@ src/features/<feature>/
 | 시각   | `timestamp({ withTimezone: true })`              | `timestamptz`. UTC 시점 저장 → 타임존 모호성 제거. (`timestamp` without tz 금지)         |
 
 - `$defaultFn`(앱 생성)은 **Drizzle ORM 경로(`db.insert`)로 넣을 때만** 동작한다. raw SQL INSERT는 ID가 안 채워지니 앱 경유 삽입을 전제로 한다.
+
+### 정렬 (collation)
+
+> **한 줄 요약: collation은 쿼리가 아니라 DB 레벨에 선언한다 — 모든 환경의 DB는 builtin `C.UTF-8`로 생성한다(PG 17+). 쿼리에 `COLLATE "C"`를 명시하지 않는다.**
+
+- **왜 DB 기본값을 바꾸나**: glibc `en_US.utf8` 같은 언어별 collation은 ① 한글을 가나다순으로 정렬하지 **않고**('아단소니' < '델리시오사' — E2E로 발견한 실제 동작), ② prefix `LIKE 'abc%'`가 B-tree 인덱스를 못 타며, ③ OS(glibc) 업그레이드 시 정렬 규칙이 바뀌어 **인덱스가 조용히 깨질 수 있다**. builtin `C.UTF-8`은 코드포인트 정렬(= 완성형 한글 가나다순, 버전 불변) + 유니코드 ctype(`lower`/`ILIKE`가 비ASCII에도 동작)으로 세 문제를 모두 없앤다.
+- **왜 per-query/컬럼이 아니라 DB 레벨인가**: 쿼리마다 `COLLATE "C"`는 "잊지 말아야 하는 규칙"(fail-open)이고 기본 인덱스도 못 탄다. 기본값이 옳으면 규칙이 필요 없다.
+- **환경 프로비저닝** (DB 생성 시점에만 지정 가능 — 사후 변경은 재생성):
+  - 로컬 docker: `-e POSTGRES_INITDB_ARGS='--locale-provider=builtin --builtin-locale=C.UTF-8'`
+  - E2E: `test/helpers/setup-e2e.ts`의 `createPostgresContainer()`가 동일 설정 적용 — **컨테이너를 직접 띄우는 테스트도 반드시 이 팩토리를 쓴다.**
+  - 운영(RDS 등): DB 생성 시 동일하게 지정 (RDS는 PG 17+에서 builtin provider 지원).
+- 진짜 언어학적 정렬(예: 다국어 사전식)이 필요해지는 특정 쿼리만 그때 ICU collation을 **명시적으로** 붙인다.
 
 ### 시드 (reference data)
 

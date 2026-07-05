@@ -16,8 +16,17 @@ export type FakeFileStorage = Pick<
   missingKeys: Set<string>;
 };
 
+// 운영/로컬 DB와 동일한 collation 정책(builtin C.UTF-8 — 한글 코드포인트 정렬)으로
+// 컨테이너를 만든다. CLAUDE.md "정렬 (collation)" 참조. 컨테이너를 직접 띄우는
+// 테스트(시드 등)도 반드시 이 팩토리를 쓴다 — 아니면 en_US.utf8로 떠서 정렬이 갈린다.
+export function createPostgresContainer(): PostgreSqlContainer {
+  return new PostgreSqlContainer('postgres:18.4').withEnvironment({
+    POSTGRES_INITDB_ARGS: '--locale-provider=builtin --builtin-locale=C.UTF-8',
+  });
+}
+
 export async function setupE2E(extraControllers: Type[] = []) {
-  const container = await new PostgreSqlContainer('postgres:18.4').start();
+  const container = await createPostgresContainer().start();
 
   // ConfigModule 검증 통과용 테스트 env
   process.env.DATABASE_URL = container.getConnectionUri();
