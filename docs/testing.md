@@ -81,6 +81,7 @@
 - **스키마 적용**: testcontainers Postgres + `migrate(db, { migrationsFolder })`로 **마이그레이션 파일을 적용**(push 아님 — 운영 경로 검증 + 마이그레이션 파일이 올바른지 같이 검증). drizzle v1.0 마이그레이션은 `폴더/migration.sql + snapshot.json` 구조다.
 - **`DRIZZLE` provider override 필수**: 앱·migrate·테스트가 *같은 db 인스턴스*를 공유하도록 `overrideProvider(DRIZZLE).useValue(testDb)`. **env 의존(`process.env.DATABASE_URL`) 금지** — `ConfigModule`이 `.env`를 로드해 앱이 다른 DB로 새어나간다(앱은 로컬, migrate는 컨테이너가 되어 "relation does not exist").
 - **외부 어댑터 override**: verifier 등 외부 HTTP는 `overrideProvider(...).useValue(fake)`로 차단(클래스로 둔 덕). 단위는 MSW, E2E는 override.
+- **테스트 env는 `test/helpers/test-env.ts`(vitest `setupFiles`)가 세팅** — `setupE2E()` 런타임이 아니다. `ConfigModule.forRoot()`는 AppModule **import 시점**(스펙 파일의 정적 import 체인)에 `.env` 로드+검증 스냅샷을 동기로 끝내고, `ConfigService.get()`은 `process.env`보다 그 스냅샷을 먼저 본다 → `beforeAll`에서 `process.env`를 바꿔도 검증된 키에는 반영되지 않는다(E2E로 발견한 실제 동작 — 그동안 E2E가 로컬 `.env` 값으로 돌고 있었다). setupFiles는 테스트 파일 import 전에 실행되므로 predefined 우선 병합으로 스냅샷에 박히고, E2E가 개발자 `.env`에 의존하지 않는다.
 - **상태 격리**: `beforeEach` truncate(자식 테이블 먼저). 컨테이너는 스위트당 1개(케이스마다 X).
 - **teardown 순서**: `app.close()` → `pool.end()` → `container.stop()`. pool을 컨테이너보다 **먼저** 정상 종료해야 `57P01 terminating connection` unhandled가 안 난다.
 - **barrel 동기화**: `schema/index.ts`(drizzle-kit의 단일 소스)에 모든 스키마가 export돼야 generate·런타임이 인식한다. 빠지면 그 테이블이 마이그레이션·앱 양쪽에서 누락된다.

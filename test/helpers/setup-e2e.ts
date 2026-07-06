@@ -28,15 +28,9 @@ export function createPostgresContainer(): PostgreSqlContainer {
 export async function setupE2E(extraControllers: Type[] = []) {
   const container = await createPostgresContainer().start();
 
-  // ConfigModule 검증 통과용 테스트 env
-  process.env.DATABASE_URL = container.getConnectionUri();
-  process.env.JWT_ACCESS_SECRET = 'test-secret';
-  process.env.GOOGLE_CLIENT_IDS = 'test-google-id';
-  process.env.KAKAO_APP_ID = '12345';
-  process.env.REFRESH_TOKEN_TTL_DAYS = '30';
-  process.env.TRUST_PROXY_HOPS = '0';
-  process.env.AWS_REGION = 'ap-northeast-2';
-  process.env.S3_PUBLIC_FILE_BUCKET = 'test-bucket';
+  // 테스트 env는 여기(런타임)가 아니라 test-env.ts(vitest setupFiles)가 세팅한다 —
+  // ConfigModule.forRoot가 AppModule import 시점에 env 스냅샷을 뜨므로 여기선 늦다.
+  // 컨테이너 DB는 process.env가 아니라 DRIZZLE provider override로 주입한다(아래).
 
   // 스키마 마이그레이션 (drizzle.config의 out 경로 확인 — 보통 ./drizzle)
   const pool = new Pool({ connectionString: container.getConnectionUri() });
