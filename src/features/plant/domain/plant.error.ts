@@ -21,3 +21,8 @@ export class PlantNameTakenError extends DomainError {
   readonly code = 'PLANT_NAME_TAKEN';
   readonly status = HttpStatus.CONFLICT;
 }
+
+export class PlantNotFoundError extends DomainError {
+  readonly code = 'PLANT_NOT_FOUND';
+  readonly status = HttpStatus.NOT_FOUND;
+}

@@ -8,6 +8,7 @@ import { Pool } from 'pg';
 import { DrizzleDB } from '../src/database/drizzle.constants';
 import { plants, users } from '../src/database/schema';
 import { setupE2E, FakeFileStorage } from './helpers/setup-e2e';
+import { TEST_FILE_BASE_URL } from './helpers/test-env';
 
 describe('Plant (e2e)', () => {
   let app: INestApplication;
@@ -70,13 +71,21 @@ describe('Plant (e2e)', () => {
     category: '관엽',
   };
 
-  it('201: 생성 — 응답에 id/이미지/메타/createdAt', async () => {
+  it('201: 생성 — 응답은 조회 표현(GET /plants/:id와 동일, 이미지는 url)', async () => {
     const { status, body } = await postPlants(validPayload, accessToken);
 
     expect(status).toBe(201);
     expect(body.id).toMatch(/^[0-9a-f-]{36}$/i);
     expect(body.name).toBe('몬스테라 알보');
-    expect(body.images).toEqual(validPayload.images);
+    // key(불투명)가 아니라 조합된 읽기 URL — toEqual 정확 일치라 key 미노출까지 보장.
+    expect(body.images).toEqual([
+      {
+        url: `${TEST_FILE_BASE_URL}/${validPayload.images[0].key}`,
+        width: 800,
+        height: 600,
+      },
+      { url: `${TEST_FILE_BASE_URL}/${validPayload.images[1].key}` },
+    ]);
     expect(body.genus).toBe('Monstera');
     expect(body.species).toBe('deliciosa');
     expect(body.category).toBe('관엽');

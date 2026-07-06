@@ -61,6 +61,12 @@ const envSchema = z.object({
   // 접근등급별 버킷 분리 — public(CloudFront OAC, unsigned) 파일용 버킷.
   // seam: private 파일(채팅)은 S3_PRIVATE_FILE_BUCKET + CloudFront signed URL 키를 chat feature 때 추가.
   S3_PUBLIC_FILE_BUCKET: z.string().min(1),
+  // public 버킷 앞 CloudFront/CDN base — 읽기 URL 조합용(`${PUBLIC_FILE_BASE_URL}/${key}`).
+  // 끝 슬래시 금지(조합 시 이중 슬래시 방지) — silent strip이 아니라 fail-fast.
+  // seam: private 파일(채팅)은 PRIVATE_FILE_BASE_URL(signed URL용 배포 도메인)을 chat feature 때 추가.
+  PUBLIC_FILE_BASE_URL: z
+    .url()
+    .refine((u) => !u.endsWith('/'), 'no trailing slash'),
 });
 
 export type Env = z.infer<typeof envSchema>;

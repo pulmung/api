@@ -42,8 +42,9 @@ presentation → application → domain ← (repository | infrastructure)
 
 - "읽기와 쓰기는 다른 모델을 써도 된다"만 채택. **`@nestjs/cqrs`(CommandBus) 미도입** — 이벤트소싱/비동기 분리가 필요할 때까지 YAGNI.
 - **쓰기**: 도메인을 거친다. UseCase = Command 핸들러(`XxxUseCase.execute`). 도메인 엔티티 → `writer`.
-- **읽기**: 도메인을 우회한다. `reader`가 DB → 전용 DTO 직빵(부분 select 자유).
-  - 읽기 **참조 구현**: `features/plant` 사전 조회(`GET /genera`·`GET /species?genus=`) — controller → reader 직행(유스케이스 없음), 쿼리 DTO(`@Query() dto`, 글로벌 파이프가 검증), 공개 라우트(무표시), reference-data엔 `Cache-Control`(public + max-age + stale-while-revalidate).
+- **읽기**: 도메인을 우회한다. `reader`는 **순수 DB 접근**(부분 select, 반환은 추론) — read model 조합을 여기 두지 않는다. 조합 유무로 두 단계가 갈린다:
+  - **조합 0** (부분 select가 곧 응답): controller → reader **직행**. 참조 구현: `features/plant` 사전 조회(`GET /genera`·`GET /species?genus=`) — 쿼리 DTO(`@Query() dto`, 글로벌 파이프가 검증), 공개 라우트(무표시), reference-data엔 `Cache-Control`(public + max-age + stale-while-revalidate).
+  - **조합 있음** (여러 어댑터 조합·표현 변환): controller → **application 쿼리 서비스** → reader. 참조 구현: `features/plant` 카탈로그 조회(`GET /plants`·`GET /plants/:id`) — `PlantQueryService`가 reader 행 + `PublicFileUrlResolver`(파일 URL)를 read model로 조합. CQRS의 쿼리 핸들러 자리이며, 조합 없는 읽기에 이 레이어를 두면 pass-through 의례다(§0).
 - UseCase **1개 = 1 클래스 + `execute`** (동작마다 의존이 다를 때). 의존이 거의 같으면 한 서비스로 묶어도 됨 — 기준은 **의존 응집도**이지 규칙이 아니다.
 
 ---
@@ -119,6 +120,7 @@ features/<feature>/
 
 - **endpoint별 작은 파일.** 모듈 거대 묶음(`auth.request.ts`에 전부)·`request/`·`response/` 폴더 분리 금지(feature-first 역행). 분류가 필요하면 폴더가 아니라 **파일명 suffix**.
 - **응답 공유 기준 = "변경 이유가 같은가"**. 같으면 공유(`AuthTokensDto`를 login/signup/refresh가), 다르면 분리.
+- **생성(POST) 201 응답 = 그 리소스의 조회 표현**(REST 관례: 201 body ≒ GET 표현). 별도 "생성 응답 DTO"를 만들지 않고 조회 DTO를 재사용하며, 컨트롤러가 생성 직후 reader로 재조회해 반환한다 — 쿼리 1개를 내고 생성/조회 표현의 이원화를 구조적으로 차단. (예: POST /plants·GET /plants/:id가 `PlantDetailDto` 공유.)
 - 모듈 간 응답 중첩 회피 → 순환 방지장치(`base.response`)가 애초에 불필요. 각 DTO는 자기 endpoint의 계약(optional 떡칠 만능 DTO 금지 = 거짓말 금지).
 - nestjs-zod: 요청 `createZodDto` + 글로벌 `ZodValidationPipe`. 응답 **`@ZodResponse`**(직렬화 + OpenAPI 문서 + 컴파일 반환검증, 공식 권장 / `@ZodSerializerDto`보다 우위). 문서화는 `.meta({ description, example })` / `.describe()`.
 - **셀렉트박스/상수 목록의 공급 기준 = "변경이 어느 배포 트레인을 타는가"**: 코드 배포와 함께만 변하는 **닫힌 enum**(예: `plantCategories`)은 런타임 API를 만들지 않는다 — 스펙의 enum → codegen으로 전달. 운영 중 배포 없이 변하는 **열린 사전**(예: genera/species, admin 큐레이션)은 reference-data 조회 API로 전달. 사용처 개수는 판단 축이 아니다.

@@ -113,7 +113,7 @@ testing.md의 "가장 싸게 신뢰를 주는 레벨" 적용:
 | 이미지 치수                      | 클라 제공값 = 신뢰 불가 힌트(피드 CLS 방지용으론 충분). 진짜 치수는 추후 S3 이벤트→Lambda |
 | 고아 파일 정리                   | S3 lifecycle 규칙 (원장 테이블이 없으니 DB 스윕 없음)                          |
 | 원본 파일명 복원(채팅 다운로드)   | 메타를 message jsonb에 + presigned GET `ResponseContentDisposition`            |
-| `FILE_BASE_URL` (읽기 URL 조합)  | 첫 읽기 경로(plant 조회)에서 도입                                              |
+| `PUBLIC_FILE_BASE_URL` (읽기 URL 조합)  | ✅ 구현됨 (`PublicFileUrlResolver` — plant 조회 응답이 사용. private signed URL은 `PRIVATE_FILE_BASE_URL`로 이 축에서 확장) |
 
 ## 7. 인프라 요구 (코드 밖 — 배포 전 체크)
 

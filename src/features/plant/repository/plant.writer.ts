@@ -11,22 +11,18 @@ import { PlantNameTakenError } from '../domain/plant.error';
 export class PlantWriter {
   constructor(@Inject(DRIZZLE) private readonly db: DrizzleDB) {}
 
-  // createdAt은 DB(defaultNow)가 생성 → 응답에 필요한 값만 returning으로 받는다(1쿼리).
-  async create(plant: Plant): Promise<{ createdAt: Date }> {
+  // 응답은 컨트롤러가 재조회(PlantReader)로 만든다 — writer는 영속화만.
+  async create(plant: Plant): Promise<void> {
     try {
-      const [row] = await this.db
-        .insert(plants)
-        .values({
-          id: plant.id,
-          name: plant.name,
-          images: plant.images,
-          genus: plant.genus,
-          species: plant.species,
-          category: plant.category,
-          createdById: plant.createdById,
-        })
-        .returning({ createdAt: plants.createdAt });
-      return row;
+      await this.db.insert(plants).values({
+        id: plant.id,
+        name: plant.name,
+        images: plant.images,
+        genus: plant.genus,
+        species: plant.species,
+        category: plant.category,
+        createdById: plant.createdById,
+      });
     } catch (e) {
       const cause = e instanceof DrizzleQueryError ? e.cause : e;
       if (

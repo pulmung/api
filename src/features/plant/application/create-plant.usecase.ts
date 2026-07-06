@@ -6,17 +6,6 @@ import { PlantImage } from '../domain/plant-image';
 import { PlantImageNotUploadedError } from '../domain/plant.error';
 import { PlantWriter } from '../repository/plant.writer';
 
-// 경계(응답으로 흐름) → 명시 타입(§5).
-export type CreatedPlant = {
-  id: string;
-  name: string;
-  images: PlantImage[];
-  genus: string | null;
-  species: string | null;
-  category: PlantCategory | null;
-  createdAt: string;
-};
-
 @Injectable()
 export class CreatePlantUseCase {
   constructor(
@@ -31,7 +20,7 @@ export class CreatePlantUseCase {
     species?: string;
     category?: PlantCategory;
     createdById: string;
-  }): Promise<CreatedPlant> {
+  }): Promise<{ id: string }> {
     // 싼 불변식 먼저 — S3 왕복 전에 도메인에서 거른다.
     const plant = Plant.create(command);
 
@@ -44,17 +33,9 @@ export class CreatePlantUseCase {
       throw new PlantImageNotUploadedError();
     }
 
-    const { createdAt } = await this.plantWriter.create(plant);
+    await this.plantWriter.create(plant);
 
-    return {
-      id: plant.id,
-      name: plant.name,
-      images: plant.images,
-      genus: plant.genus,
-      species: plant.species,
-      category: plant.category,
-      // Date 그대로 반환하면 응답 직렬화(z.iso.datetime)가 거부한다 → ISO 문자열로.
-      createdAt: createdAt.toISOString(),
-    };
+    // 커맨드 결과는 식별자만 — 응답 표현(조회 DTO)은 컨트롤러가 재조회로 만든다.
+    return { id: plant.id };
   }
 }
