@@ -23,4 +23,10 @@ export const FILE_POLICIES: Record<
     allowedContentTypes: ['image/jpeg', 'image/png', 'image/webp'],
     maxSizeBytes: 10 * 1024 * 1024, // 10 MiB
   },
+  // 카탈로그와 정책이 같아도 purpose는 분리 — key에 prefix가 박혀 저장되므로
+  // 나중에 나누려면 키 마이그레이션이 필요하다. 지금 나누면 정책 독립이 공짜.
+  'user-plant-image': {
+    allowedContentTypes: ['image/jpeg', 'image/png', 'image/webp'],
+    maxSizeBytes: 10 * 1024 * 1024, // 10 MiB
+  },
 };

@@ -9,6 +9,7 @@ import { AuthModule } from './features/auth/auth.module';
 import { UserModule } from './features/user/user.module';
 import { FileModule } from './features/file/file.module';
 import { PlantModule } from './features/plant/plant.module';
+import { UserPlantModule } from './features/user-plant/user-plant.module';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { loggerModule } from './common/logger/logger.config';
 
@@ -24,6 +25,7 @@ import { loggerModule } from './common/logger/logger.config';
     UserModule,
     FileModule,
     PlantModule,
+    UserPlantModule,
   ],
   controllers: [AppController],
   providers: [
