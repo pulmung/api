@@ -17,9 +17,24 @@ export type UserPlantDetail = {
   createdAt: string;
 };
 
+export type UserPlantListItem = {
+  id: string;
+  name: string;
+  // 내 사진[0] → (없으면) 카탈로그 대표 → null. 목록 응답엔 카탈로그 이미지가 따로
+  // 없어 클라가 폴백할 수 없다 — 그래서 서버가 여기서 접는다.
+  coverImage: PlantImageView | null;
+  plant: { id: string; name: string } | null;
+  adoptedAt: string | null;
+  createdAt: string;
+};
+export type UserPlantListPage = {
+  userPlants: UserPlantListItem[];
+  nextCursor: string | null;
+};
+
 // 읽기 조합 레이어(CQRS의 쿼리 핸들러 자리) — reader(DB 행)와 file 어댑터(URL)를
-// read model로 빚는다. 지금은 POST 201 재조회 전용이며, 추후 GET /user-plants/:id가
-// 같은 표현을 공유한다(생성/조회 이원화 차단).
+// read model로 빚는다. POST 201 재조회와 GET /user-plants/:id가 같은 표현을
+// 공유한다(생성/조회 이원화 차단).
 @Injectable()
 export class UserPlantQueryService {
   constructor(
@@ -27,8 +42,37 @@ export class UserPlantQueryService {
     private readonly urlResolver: PublicFileUrlResolver,
   ) {}
 
-  async findById(id: string): Promise<UserPlantDetail | null> {
-    const row = await this.reader.findById(id);
+  async findPage(params: {
+    ownerId: string;
+    cursor?: string;
+    limit: number;
+  }): Promise<UserPlantListPage> {
+    // reader는 hasMore 판별용 limit+1행까지 준다(n+1) — 끝 감지에 COUNT 불필요.
+    const rows = await this.reader.findPageRows(params);
+    const hasMore = rows.length > params.limit;
+    const page = hasMore ? rows.slice(0, params.limit) : rows;
+
+    return {
+      userPlants: page.map((row) => {
+        const cover = row.images[0] ?? row.plant?.images[0];
+        return {
+          id: row.id,
+          name: row.name,
+          coverImage: cover ? this.toImageView(cover) : null,
+          plant: row.plant ? { id: row.plant.id, name: row.plant.name } : null,
+          adoptedAt: row.adoptedAt,
+          createdAt: row.createdAt.toISOString(),
+        };
+      }),
+      nextCursor: hasMore ? page[page.length - 1].id : null,
+    };
+  }
+
+  async findById(
+    id: string,
+    ownerId: string,
+  ): Promise<UserPlantDetail | null> {
+    const row = await this.reader.findById(id, ownerId);
     if (!row) return null;
 
     return {

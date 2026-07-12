@@ -2,6 +2,12 @@ import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 import { PlantImageSchema } from '../../../plant/presentation/dto/plant-image.schema';
 
+const UserPlantIdParamSchema = z.object({
+  id: z.uuid().meta({ description: '내 식물(개체) id' }),
+});
+
+export class UserPlantIdParamDto extends createZodDto(UserPlantIdParamSchema) {}
+
 const UserPlantDetailSchema = z.object({
   id: z.uuid(),
   name: z.string().meta({ description: '개체 애칭', example: '초록이' }),

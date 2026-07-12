@@ -23,3 +23,10 @@ export class ReferencedPlantNotFoundError extends DomainError {
   readonly code = 'REFERENCED_PLANT_NOT_FOUND';
   readonly status = HttpStatus.UNPROCESSABLE_ENTITY;
 }
+
+// 비존재와 타인 소유 모두 이 하나로 — 소유 여부를 403으로 갈라주면 id 존재가
+// 새는 oracle이 된다(존재 은닉).
+export class UserPlantNotFoundError extends DomainError {
+  readonly code = 'USER_PLANT_NOT_FOUND';
+  readonly status = HttpStatus.NOT_FOUND;
+}

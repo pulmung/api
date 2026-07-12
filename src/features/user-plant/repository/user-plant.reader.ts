@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
+import { and, desc, eq, lt } from 'drizzle-orm';
 import { DRIZZLE, type DrizzleDB } from '../../../database/drizzle.constants';
 import { plants, userPlants } from '../../../database/schema';
 
@@ -17,6 +17,18 @@ const USER_PLANT_ROW = {
   plant: { id: plants.id, name: plants.name },
 };
 
+// 목록 프로젝션 — memo 제외(상세 전용), 대신 카탈로그 images 포함: 개체 사진이
+// 없을 때 커버를 카탈로그 대표로 폴백하는 재료(응답엔 안 나감, query service가 소비).
+// 중첩 객체 안에 두는 이유 — 미연결(join 미매칭)이면 plant째 null로 접혀 타입이 정직하다.
+const USER_PLANT_LIST_ROW = {
+  id: userPlants.id,
+  name: userPlants.name,
+  images: userPlants.images,
+  adoptedAt: userPlants.adoptedAt,
+  createdAt: userPlants.createdAt,
+  plant: { id: plants.id, name: plants.name, images: plants.images },
+};
+
 // 읽기 어댑터 — 순수 DB 접근. plants 테이블 직접 join은 모듈 경계 위반이 아니라
 // CQRS 읽기의 정상 경로다(read model은 테이블을 횡단한다) — PlantModule 경유(추가
 // 쿼리)는 순수성 의례일 뿐. 쓰기 쪽 결합은 이미 FK가 DB 레벨에서 갖고 있다.
@@ -24,12 +36,35 @@ const USER_PLANT_ROW = {
 export class UserPlantReader {
   constructor(@Inject(DRIZZLE) private readonly db: DrizzleDB) {}
 
-  async findById(id: string) {
+  // owner 스코프 — 타인 개체는 비존재와 동일하게 null(존재 은닉, 404 하나로 수렴).
+  async findById(id: string, ownerId: string) {
     const [row] = await this.db
       .select(USER_PLANT_ROW)
       .from(userPlants)
       .leftJoin(plants, eq(userPlants.plantId, plants.id))
-      .where(eq(userPlants.id, id));
+      .where(and(eq(userPlants.id, id), eq(userPlants.ownerId, ownerId)));
     return row ?? null;
+  }
+
+  // keyset 페이지네이션 — plant 카탈로그와 동일 패턴(uuidv7 id DESC = 최신순).
+  // owner 필터는 idx_user_plants_owner가 커버(개인 컬렉션 규모라 복합 인덱스 불필요).
+  // ⚠️ hasMore 판별용으로 limit+1개까지 반환한다(n+1) — 자르기·nextCursor는 호출자 몫.
+  async findPageRows(params: {
+    ownerId: string;
+    cursor?: string;
+    limit: number;
+  }) {
+    return this.db
+      .select(USER_PLANT_LIST_ROW)
+      .from(userPlants)
+      .leftJoin(plants, eq(userPlants.plantId, plants.id))
+      .where(
+        and(
+          eq(userPlants.ownerId, params.ownerId),
+          params.cursor ? lt(userPlants.id, params.cursor) : undefined,
+        ),
+      )
+      .orderBy(desc(userPlants.id))
+      .limit(params.limit + 1);
   }
 }
