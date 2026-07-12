@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { FileModule } from '../file/file.module';
 import { CreateUserPlantUseCase } from './application/create-user-plant.usecase';
+import { UpdateUserPlantUseCase } from './application/update-user-plant.usecase';
+import { DeleteUserPlantUseCase } from './application/delete-user-plant.usecase';
 import { UserPlantQueryService } from './application/user-plant-query.service';
 import { UserPlantWriter } from './repository/user-plant.writer';
 import { UserPlantReader } from './repository/user-plant.reader';
@@ -14,6 +16,8 @@ import { UserPlantController } from './presentation/user-plant.controller';
   controllers: [UserPlantController],
   providers: [
     CreateUserPlantUseCase,
+    UpdateUserPlantUseCase,
+    DeleteUserPlantUseCase,
     UserPlantQueryService,
     UserPlantWriter,
     UserPlantReader,
