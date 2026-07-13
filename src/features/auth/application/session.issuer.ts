@@ -46,9 +46,19 @@ export class SessionIssuer {
     return new Date(Date.now() + days * 86_400_000);
   }
 
-  async rotate(sessionId: string, userId: string) {
+  async rotate(sessionId: string, userId: string, currentTokenHash: string) {
     const { token, tokenHash } = rotateRefreshToken(sessionId);
-    await this.sessionWriter.rotate(sessionId, tokenHash);
+    await this.sessionWriter.rotate(sessionId, {
+      tokenHash,
+      prevTokenHash: currentTokenHash,
+    });
+    return { accessToken: this.jwtIssuer.issue(userId), refreshToken: token };
+  }
+
+  // grace 회전: prev pin 유지 (SessionWriter.graceRotate 참조)
+  async graceRotate(sessionId: string, userId: string) {
+    const { token, tokenHash } = rotateRefreshToken(sessionId);
+    await this.sessionWriter.graceRotate(sessionId, tokenHash);
     return { accessToken: this.jwtIssuer.issue(userId), refreshToken: token };
   }
 }

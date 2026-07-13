@@ -13,6 +13,8 @@ export class SessionReader {
         id: sessions.id,
         userId: sessions.userId,
         tokenHash: sessions.tokenHash,
+        prevTokenHash: sessions.prevTokenHash,
+        rotatedAt: sessions.rotatedAt,
         expiresAt: sessions.expiresAt,
       })
       .from(sessions)

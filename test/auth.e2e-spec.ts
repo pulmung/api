@@ -9,6 +9,7 @@ import { DrizzleDB } from '../src/database/drizzle.constants';
 import { sessions } from '../src/database/schema';
 import { users } from '../src/database/schema';
 import { setupE2E } from './helpers/setup-e2e';
+import { REFRESH_REUSE_GRACE_MS } from '../src/features/auth/application/refresh-session.usecase';
 
 describe('Auth (e2e)', () => {
   let app: INestApplication;
@@ -48,6 +49,14 @@ describe('Auth (e2e)', () => {
   };
 
   const sessionIdOf = (refreshToken: string) => refreshToken.split('.')[0];
+
+  // grace 만료 시뮬레이션: rotated_at을 과거로 되감는다 (실시간 대기 X)
+  const rewindRotatedAt = async (refreshToken: string, msAgo: number) => {
+    await db
+      .update(sessions)
+      .set({ rotatedAt: new Date(Date.now() - msAgo) })
+      .where(eq(sessions.id, sessionIdOf(refreshToken)));
+  };
 
   describe('POST /auth/signup', () => {
     it('201: 가입 성공 -> 토큰 발급', async () => {
@@ -127,10 +136,13 @@ describe('Auth (e2e)', () => {
       expect(body.refreshToken).not.toBe(rtA);
     });
 
-    it('401: 회전 후 옛 토큰 재사용 -> 세션 전체 무효화', async () => {
+    it('401: grace 만료 후 옛 토큰 재사용 -> 세션 전체 무효화', async () => {
       const rtA = await register();
       const rotated = await post('/auth/refresh', { refreshToken: rtA });
       const rtB = rotated.body.refreshToken as string;
+
+      // grace window를 지난 시점으로 되감기
+      await rewindRotatedAt(rtA, REFRESH_REUSE_GRACE_MS + 1_000);
 
       // 옛 토큰(rtA) 재사용 = 탈취 의심 -> 401
       const reuse = await post('/auth/refresh', { refreshToken: rtA });
@@ -148,6 +160,67 @@ describe('Auth (e2e)', () => {
         .from(sessions)
         .where(eq(sessions.id, sessionIdOf(rtA)));
       expect(rows).toHaveLength(0);
+    });
+
+    it('200: grace window 내 옛 토큰 재사용(멀티탭 레이스) -> 새 토큰 발급', async () => {
+      const rtA = await register();
+      const first = await post('/auth/refresh', { refreshToken: rtA });
+      const rtB = first.body.refreshToken as string;
+
+      const { status, body } = await post('/auth/refresh', {
+        refreshToken: rtA,
+      });
+      expect(status).toBe(200);
+      expect(body.refreshToken).toBeDefined();
+      expect(body.refreshToken).not.toBe(rtA);
+      expect(body.refreshToken).not.toBe(rtB);
+
+      // grace로 받은 최신 토큰은 정상 사용 가능
+      const next = await post('/auth/refresh', {
+        refreshToken: body.refreshToken as string,
+      });
+      expect(next.status).toBe(200);
+    });
+
+    it('200: grace 내 같은 옛 토큰 N회 재사용도 모두 통과 (prev pin)', async () => {
+      const rtA = await register();
+      await post('/auth/refresh', { refreshToken: rtA }); // 정상 회전 -> prev=hash(A) pin
+
+      for (let i = 0; i < 3; i++) {
+        const { status } = await post('/auth/refresh', { refreshToken: rtA });
+        expect(status).toBe(200); // prev가 매번 바뀌면 2번째부터 nuke — pin 덕에 전부 통과
+      }
+    });
+
+    it('401: grace 회전으로 대체된 중간 토큰 제시 -> 세션 전체 무효화', async () => {
+      const rtA = await register();
+      const first = await post('/auth/refresh', { refreshToken: rtA }); // cur=B, prev=A
+      const rtB = first.body.refreshToken as string;
+      await post('/auth/refresh', { refreshToken: rtA }); // grace: cur=C, prev=A — B는 고아
+
+      const { status, body } = await post('/auth/refresh', {
+        refreshToken: rtB,
+      });
+      expect(status).toBe(401);
+      expect(body.errorCode).toBe('INVALID_REFRESH_TOKEN');
+
+      const rows = await db
+        .select()
+        .from(sessions)
+        .where(eq(sessions.id, sessionIdOf(rtA)));
+      expect(rows).toHaveLength(0);
+    });
+
+    it('401: 세션 만료 후에는 grace 내 옛 토큰도 거부', async () => {
+      const rtA = await register();
+      await post('/auth/refresh', { refreshToken: rtA }); // prev=hash(A), grace 진행 중
+      await db
+        .update(sessions)
+        .set({ expiresAt: new Date(Date.now() - 1_000) })
+        .where(eq(sessions.id, sessionIdOf(rtA)));
+
+      const { status } = await post('/auth/refresh', { refreshToken: rtA });
+      expect(status).toBe(401);
     });
   });
 
