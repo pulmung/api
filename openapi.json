@@ -313,6 +313,246 @@
         ]
       }
     },
+    "/users/me": {
+      "get": {
+        "operationId": "UserController_me",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "내 프로필 — 대상은 항상 JWT sub(본인)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserProfileDto_Output"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "statusCode",
+                    "errorCode",
+                    "message"
+                  ],
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "example": 401
+                    },
+                    "errorCode": {
+                      "type": "string",
+                      "enum": [
+                        "UNAUTHENTICATED"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "statusCode",
+                    "errorCode",
+                    "message"
+                  ],
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "example": 404
+                    },
+                    "errorCode": {
+                      "type": "string",
+                      "enum": [
+                        "USER_NOT_FOUND"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "User"
+        ]
+      },
+      "patch": {
+        "operationId": "UserController_update",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "내 프로필 부분 수정 (JSON Merge Patch — 현재 nickname만). 응답 = GET /users/me와 같은 조회 표현",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserProfileDto_Output"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "statusCode",
+                    "errorCode",
+                    "message"
+                  ],
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "example": 401
+                    },
+                    "errorCode": {
+                      "type": "string",
+                      "enum": [
+                        "UNAUTHENTICATED"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "statusCode",
+                    "errorCode",
+                    "message"
+                  ],
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "example": 404
+                    },
+                    "errorCode": {
+                      "type": "string",
+                      "enum": [
+                        "USER_NOT_FOUND"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "statusCode",
+                    "errorCode",
+                    "message"
+                  ],
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "example": 409
+                    },
+                    "errorCode": {
+                      "type": "string",
+                      "enum": [
+                        "NICKNAME_TAKEN"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "statusCode",
+                    "errorCode",
+                    "message"
+                  ],
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "example": 422
+                    },
+                    "errorCode": {
+                      "type": "string",
+                      "enum": [
+                        "INVALID_NICKNAME"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "User"
+        ]
+      }
+    },
     "/files": {
       "post": {
         "operationId": "FileController_create",
@@ -1220,15 +1460,18 @@
       }
     },
     "schemas": {
+      "SignupDtoSocialProvider": {
+        "type": "string",
+        "enum": [
+          "kakao",
+          "google"
+        ]
+      },
       "SignupDto": {
         "type": "object",
         "properties": {
           "provider": {
-            "type": "string",
-            "enum": [
-              "kakao",
-              "google"
-            ]
+            "$ref": "#/components/schemas/SignupDtoSocialProvider"
           },
           "accessToken": {
             "type": "string",
@@ -1274,15 +1517,18 @@
         ],
         "additionalProperties": false
       },
+      "LoginDtoSocialProvider": {
+        "type": "string",
+        "enum": [
+          "kakao",
+          "google"
+        ]
+      },
       "LoginDto": {
         "type": "object",
         "properties": {
           "provider": {
-            "type": "string",
-            "enum": [
-              "kakao",
-              "google"
-            ]
+            "$ref": "#/components/schemas/LoginDtoSocialProvider"
           },
           "accessToken": {
             "type": "string",
@@ -1317,6 +1563,70 @@
         "required": [
           "refreshToken"
         ]
+      },
+      "SocialProvider_Output": {
+        "type": "string",
+        "enum": [
+          "kakao",
+          "google"
+        ],
+        "id": "SocialProvider_Output"
+      },
+      "UserProfileDto_Output": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "provider": {
+            "$ref": "#/components/schemas/SocialProvider_Output"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "소셜 프로필 이메일 — 미동의/미제공이면 null",
+            "example": "user@kakao.com"
+          },
+          "nickname": {
+            "type": "string",
+            "description": "닉네임 — 전역 유니크",
+            "example": "풀멍"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+            "description": "가입 시각"
+          }
+        },
+        "required": [
+          "id",
+          "provider",
+          "email",
+          "nickname",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      },
+      "UpdateUserDto": {
+        "type": "object",
+        "properties": {
+          "nickname": {
+            "description": "닉네임 — 전역 유니크, 항상 있어야 하는 필드라 null 불가",
+            "example": "풀멍",
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 20
+          }
+        }
       },
       "CreateFileUploadDto": {
         "type": "object",

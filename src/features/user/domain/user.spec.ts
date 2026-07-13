@@ -1,6 +1,27 @@
 import { describe, it, expect } from 'vitest';
-import { User } from './user';
+import { User, validateNickname } from './user';
 import { InvalidNicknameError } from './user.error';
+
+describe('validateNickname', () => {
+  it('앞뒤 공백을 제거한 값을 반환한다', () => {
+    expect(validateNickname('   풀멍   ')).toBe('풀멍');
+  });
+
+  it.each([
+    ['2자 (최소)', 'ab'],
+    ['20자 (최대)', 'a'.repeat(20)],
+  ])('경계값 %s 은 통과한다', (_, nickname) => {
+    expect(validateNickname(nickname)).toBe(nickname);
+  });
+
+  it.each([
+    ['1자 (최소 미만)', 'a'],
+    ['공백뿐 (trim 후 0자)', '    '],
+    ['21자 (최대 초과)', 'a'.repeat(21)],
+  ])('%s 이면 InvalidNicknameError', (_, nickname) => {
+    expect(() => validateNickname(nickname)).toThrow(InvalidNicknameError);
+  });
+});
 
 describe('User.register', () => {
   const valid = {
