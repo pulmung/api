@@ -1016,7 +1016,8 @@
                         "REFERENCED_PLANT_NOT_FOUND",
                         "USER_PLANT_IMAGE_NOT_UPLOADED",
                         "INVALID_USER_PLANT_NAME",
-                        "INVALID_USER_PLANT_IMAGES"
+                        "INVALID_USER_PLANT_IMAGES",
+                        "INVALID_WATERING_INTERVAL"
                       ]
                     },
                     "message": {
@@ -1331,7 +1332,8 @@
                         "REFERENCED_PLANT_NOT_FOUND",
                         "USER_PLANT_IMAGE_NOT_UPLOADED",
                         "INVALID_USER_PLANT_NAME",
-                        "INVALID_USER_PLANT_IMAGES"
+                        "INVALID_USER_PLANT_IMAGES",
+                        "INVALID_WATERING_INTERVAL"
                       ]
                     },
                     "message": {
@@ -1439,6 +1441,335 @@
         ],
         "tags": [
           "UserPlant"
+        ]
+      }
+    },
+    "/user-plants/{id}/waterings": {
+      "post": {
+        "operationId": "WateringController_record",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "내 식물(개체) id",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordWateringDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "물주기 기록. 같은 개체·같은 날 재기록은 기존 기록으로 동일 201(멱등 — 더블탭 안전). 타인/비존재 개체는 404(존재 은닉)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Watering_Output"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "statusCode",
+                    "errorCode",
+                    "message"
+                  ],
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "example": 401
+                    },
+                    "errorCode": {
+                      "type": "string",
+                      "enum": [
+                        "UNAUTHENTICATED"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "statusCode",
+                    "errorCode",
+                    "message"
+                  ],
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "example": 404
+                    },
+                    "errorCode": {
+                      "type": "string",
+                      "enum": [
+                        "USER_PLANT_NOT_FOUND"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Watering"
+        ]
+      },
+      "get": {
+        "operationId": "WateringController_list",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "내 식물(개체) id",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "이전 페이지 마지막 wateredOn. 생략 시 첫 페이지. 삭제된 날짜여도 동작(존재 검사 없음)",
+            "schema": {
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "페이지 크기 (1–50, 기본 20)",
+            "schema": {
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "물주기 이력 — 최신순(wateredOn DESC) keyset 페이지네이션. 타인/비존재 개체는 404(존재 은닉)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WateringListDto_Output"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "statusCode",
+                    "errorCode",
+                    "message"
+                  ],
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "example": 401
+                    },
+                    "errorCode": {
+                      "type": "string",
+                      "enum": [
+                        "UNAUTHENTICATED"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "statusCode",
+                    "errorCode",
+                    "message"
+                  ],
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "example": 404
+                    },
+                    "errorCode": {
+                      "type": "string",
+                      "enum": [
+                        "USER_PLANT_NOT_FOUND"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Watering"
+        ]
+      }
+    },
+    "/user-plants/{id}/waterings/{wateringId}": {
+      "delete": {
+        "operationId": "WateringController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "내 식물(개체) id",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "wateringId",
+            "required": true,
+            "in": "path",
+            "description": "물주기 기록 id",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "물주기 기록 삭제 (잘못 기록한 날 지우기) — 비존재·타 개체 소속·타인 소유 모두 404(존재 은닉)"
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "statusCode",
+                    "errorCode",
+                    "message"
+                  ],
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "example": 401
+                    },
+                    "errorCode": {
+                      "type": "string",
+                      "enum": [
+                        "UNAUTHENTICATED"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "statusCode",
+                    "errorCode",
+                    "message"
+                  ],
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "example": 404
+                    },
+                    "errorCode": {
+                      "type": "string",
+                      "enum": [
+                        "WATERING_NOT_FOUND"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Watering"
         ]
       }
     }
@@ -2060,6 +2391,13 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 1000
+          },
+          "wateringIntervalDays": {
+            "description": "물주기 간격(일) — 생략 시 물주기 관리 안 함",
+            "example": 7,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 365
           }
         },
         "required": [
@@ -2135,6 +2473,45 @@
               }
             ]
           },
+          "wateringIntervalDays": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "물주기 간격(일) — null = 관리 안 함"
+          },
+          "lastWateredOn": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "마지막 물 준 날 — 기록 없으면 null"
+          },
+          "nextWateringOn": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "다음 물주기 예정일 (lastWateredOn + 간격, 파생) — 간격 또는 기록이 없으면 null"
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time",
@@ -2148,6 +2525,9 @@
           "plant",
           "adoptedAt",
           "memo",
+          "wateringIntervalDays",
+          "lastWateredOn",
+          "nextWateringOn",
           "createdAt"
         ],
         "additionalProperties": false
@@ -2221,6 +2601,45 @@
                   ],
                   "description": "데려온 날"
                 },
+                "wateringIntervalDays": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "물주기 간격(일) — null = 관리 안 함"
+                },
+                "lastWateredOn": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "date",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "마지막 물 준 날 — 기록 없으면 null"
+                },
+                "nextWateringOn": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "date",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "다음 물주기 예정일 (lastWateredOn + 간격, 파생) — 간격 또는 기록이 없으면 null"
+                },
                 "createdAt": {
                   "type": "string",
                   "format": "date-time",
@@ -2233,6 +2652,9 @@
                 "coverImage",
                 "plant",
                 "adoptedAt",
+                "wateringIntervalDays",
+                "lastWateredOn",
+                "nextWateringOn",
                 "createdAt"
               ],
               "additionalProperties": false
@@ -2336,8 +2758,90 @@
                 "type": "null"
               }
             ]
+          },
+          "wateringIntervalDays": {
+            "description": "물주기 간격(일) — null = 물주기 관리 해제(다음 예정일 계산 off, 기록은 유지)",
+            "example": 7,
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 365
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         }
+      },
+      "RecordWateringDto": {
+        "type": "object",
+        "properties": {
+          "wateredOn": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+            "description": "물 준 날 — 유저 로컬 달력 날짜(클라가 계산). 같은 개체·같은 날 재기록은 멱등 201(기존 기록 반환)",
+            "example": "2026-07-18"
+          }
+        },
+        "required": [
+          "wateredOn"
+        ]
+      },
+      "Watering_Output": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "wateredOn": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+            "description": "물 준 날 (유저 로컬 달력 날짜)",
+            "example": "2026-07-18"
+          }
+        },
+        "required": [
+          "id",
+          "wateredOn"
+        ],
+        "additionalProperties": false,
+        "id": "Watering_Output"
+      },
+      "WateringListDto_Output": {
+        "type": "object",
+        "properties": {
+          "waterings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Watering_Output"
+            },
+            "description": "물주기 이력 — 최신순(wateredOn DESC)"
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "다음 페이지 cursor — null이면 마지막 페이지"
+          }
+        },
+        "required": [
+          "waterings",
+          "nextCursor"
+        ],
+        "additionalProperties": false
       }
     }
   }

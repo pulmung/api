@@ -4,11 +4,15 @@ import { USER_PLANT_IMAGE_KEY_PREFIX } from './user-plant-image';
 import {
   InvalidUserPlantImagesError,
   InvalidUserPlantNameError,
+  InvalidWateringIntervalError,
 } from './user-plant.error';
 
 // 불변식 한도 — DTO(Zod 경계)도 이 값을 import해 이중기재 drift를 막는다.
 export const USER_PLANT_NAME_MAX_LENGTH = 100;
 export const USER_PLANT_IMAGES_MAX = 10;
+// 물주기 간격(일) 범위. 상한 365 = "1년에 한 번"까지 — 그 이상은 관리 안 함(null)과 다르지 않다.
+export const WATERING_INTERVAL_MIN_DAYS = 1;
+export const WATERING_INTERVAL_MAX_DAYS = 365;
 
 // module-private — UserPlant.create(등록)와 UserPlantPatch.create(수정)가 같은 불변식을 공유한다.
 function validateName(raw: string): string {
@@ -35,6 +39,17 @@ function validateImages(images: PlantImage[]): PlantImage[] {
   return images;
 }
 
+function validateWateringIntervalDays(raw: number): number {
+  if (
+    !Number.isInteger(raw) ||
+    raw < WATERING_INTERVAL_MIN_DAYS ||
+    raw > WATERING_INTERVAL_MAX_DAYS
+  ) {
+    throw new InvalidWateringIntervalError();
+  }
+  return raw;
+}
+
 /**
  * 내 식물 — 유저가 실제로 키우는 개체(individual). 카탈로그(Plant)가 "종/품종"이라면
  * 이건 "우리 집 몬스테라 한 그루"다. 소유자 검증(내 것만 수정/삭제)은 컨텍스트 의존
@@ -49,6 +64,7 @@ export class UserPlant {
     readonly images: PlantImage[],
     readonly adoptedAt: string | null,
     readonly memo: string | null,
+    readonly wateringIntervalDays: number | null,
   ) {}
 
   static create(params: {
@@ -58,6 +74,7 @@ export class UserPlant {
     plantId?: string | null;
     adoptedAt?: string | null;
     memo?: string | null;
+    wateringIntervalDays?: number | null;
   }): UserPlant {
     return new UserPlant(
       uuidv7(),
@@ -71,6 +88,10 @@ export class UserPlant {
       // 서버가 유저의 "오늘"(타임존)을 모르므로 오탐이 생기고, 허용해도 해가 없다.
       params.adoptedAt ?? null,
       params.memo?.trim() || null,
+      // null = 물주기 관리 안 함(정당한 상태) — 값이 있을 때만 범위 불변식 적용.
+      params.wateringIntervalDays == null
+        ? null
+        : validateWateringIntervalDays(params.wateringIntervalDays),
     );
   }
 }
@@ -90,6 +111,7 @@ export class UserPlantPatch {
     readonly images: PlantImage[] | undefined,
     readonly adoptedAt: string | null | undefined,
     readonly memo: string | null | undefined,
+    readonly wateringIntervalDays: number | null | undefined,
   ) {}
 
   static create(params: {
@@ -98,6 +120,7 @@ export class UserPlantPatch {
     images?: PlantImage[];
     adoptedAt?: string | null;
     memo?: string | null;
+    wateringIntervalDays?: number | null;
   }): UserPlantPatch {
     return new UserPlantPatch(
       params.name === undefined ? undefined : validateName(params.name),
@@ -105,6 +128,10 @@ export class UserPlantPatch {
       params.images === undefined ? undefined : validateImages(params.images),
       params.adoptedAt,
       params.memo === undefined ? undefined : params.memo?.trim() || null,
+      // undefined(미변경)·null(해제)은 통과, 값일 때만 범위 불변식.
+      params.wateringIntervalDays == null
+        ? params.wateringIntervalDays
+        : validateWateringIntervalDays(params.wateringIntervalDays),
     );
   }
 }

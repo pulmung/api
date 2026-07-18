@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PublicFileUrlResolver } from '../../file/infrastructure/public-file-url.resolver';
 import type { PlantImage } from '../../plant/domain/plant-image';
 import type { PlantImageView } from '../../plant/application/plant-query.service';
+import { nextWateringOn } from '../domain/watering-schedule';
 import { UserPlantReader } from '../repository/user-plant.reader';
 
 // 내 식물 읽기 모델 — 응답으로 흐르는 경계 → 명시 타입(§5). 내부 행 타입은 reader 추론.
@@ -14,6 +15,11 @@ export type UserPlantDetail = {
   plant: { id: string; name: string } | null;
   adoptedAt: string | null; // 'YYYY-MM-DD' (date 컬럼 string 모드 — 변환 없음)
   memo: string | null;
+  wateringIntervalDays: number | null;
+  lastWateredOn: string | null;
+  // 파생값(lastWateredOn + interval) — 규칙은 domain(watering-schedule)이 소유,
+  // 여기선 조합만. 서버가 한 번 계산해 web·mobile의 중복 구현을 없앤다.
+  nextWateringOn: string | null;
   createdAt: string;
 };
 
@@ -25,6 +31,9 @@ export type UserPlantListItem = {
   coverImage: PlantImageView | null;
   plant: { id: string; name: string } | null;
   adoptedAt: string | null;
+  wateringIntervalDays: number | null;
+  lastWateredOn: string | null;
+  nextWateringOn: string | null;
   createdAt: string;
 };
 export type UserPlantListPage = {
@@ -61,6 +70,12 @@ export class UserPlantQueryService {
           coverImage: cover ? this.toImageView(cover) : null,
           plant: row.plant ? { id: row.plant.id, name: row.plant.name } : null,
           adoptedAt: row.adoptedAt,
+          wateringIntervalDays: row.wateringIntervalDays,
+          lastWateredOn: row.lastWateredOn,
+          nextWateringOn: nextWateringOn(
+            row.lastWateredOn,
+            row.wateringIntervalDays,
+          ),
           createdAt: row.createdAt.toISOString(),
         };
       }),
@@ -68,10 +83,7 @@ export class UserPlantQueryService {
     };
   }
 
-  async findById(
-    id: string,
-    ownerId: string,
-  ): Promise<UserPlantDetail | null> {
+  async findById(id: string, ownerId: string): Promise<UserPlantDetail | null> {
     const row = await this.reader.findById(id, ownerId);
     if (!row) return null;
 
@@ -82,6 +94,12 @@ export class UserPlantQueryService {
       plant: row.plant,
       adoptedAt: row.adoptedAt,
       memo: row.memo,
+      wateringIntervalDays: row.wateringIntervalDays,
+      lastWateredOn: row.lastWateredOn,
+      nextWateringOn: nextWateringOn(
+        row.lastWateredOn,
+        row.wateringIntervalDays,
+      ),
       // z.iso.datetime()은 Date를 거부한다 — 문자열 직렬화는 여기서.
       createdAt: row.createdAt.toISOString(),
     };

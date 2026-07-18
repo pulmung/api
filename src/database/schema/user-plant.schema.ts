@@ -1,4 +1,12 @@
-import { uuid, text, timestamp, date, index, jsonb } from 'drizzle-orm/pg-core';
+import {
+  uuid,
+  text,
+  timestamp,
+  date,
+  index,
+  jsonb,
+  integer,
+} from 'drizzle-orm/pg-core';
 import { uuidv7 } from 'uuidv7';
 import { pgTable } from './table';
 import { users } from './user.schema';
@@ -55,6 +63,12 @@ export const userPlants = pgTable(
     adoptedAt: date(),
 
     memo: text(),
+
+    // 물주기 간격(일). null = 물주기 관리 안 함(알림·다음 예정일 계산 off). 물주기 기록은 별도
+    // waterings 테이블(1:N)이지만, "얼마마다 줄지"는 개체당 한 값(1:1)이라 컬럼으로 인라인한다.
+    // 정수 1~365 불변식은 도메인 + Zod가 강제한다(DB CHECK 없음 — 이 코드베이스 관례: name 길이도
+    // DB 제약 없이 경계 검증만). 실제 예정일 파생(lastWateredOn + interval)은 읽기 조합에서 계산.
+    wateringIntervalDays: integer(),
 
     createdAt: timestamp({ withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp({ withTimezone: true })

@@ -23,6 +23,7 @@ import { UserPlantQueryService } from '../application/user-plant-query.service';
 import {
   InvalidUserPlantImagesError,
   InvalidUserPlantNameError,
+  InvalidWateringIntervalError,
   ReferencedPlantNotFoundError,
   UserPlantImageNotUploadedError,
   UserPlantNotFoundError,
@@ -54,6 +55,7 @@ export class UserPlantController {
     UserPlantImageNotUploadedError,
     InvalidUserPlantNameError,
     InvalidUserPlantImagesError,
+    InvalidWateringIntervalError,
   )
   @ZodResponse({
     status: 201,
@@ -72,6 +74,7 @@ export class UserPlantController {
       plantId: dto.plantId,
       adoptedAt: dto.adoptedAt,
       memo: dto.memo,
+      wateringIntervalDays: dto.wateringIntervalDays,
     });
 
     // 생성 201 = 조회 표현(재조회) — 생성/조회 응답의 동일성을 구조로 보장(REST 관례).
@@ -124,6 +127,7 @@ export class UserPlantController {
     UserPlantImageNotUploadedError,
     InvalidUserPlantNameError,
     InvalidUserPlantImagesError,
+    InvalidWateringIntervalError,
   )
   @ZodResponse({
     status: 200,
@@ -144,6 +148,7 @@ export class UserPlantController {
       images: dto.images,
       adoptedAt: dto.adoptedAt,
       memo: dto.memo,
+      wateringIntervalDays: dto.wateringIntervalDays,
     });
 
     // 수정 200 = 조회 표현(재조회) — POST 201과 동일 패턴, 수정/조회 응답의 동일성을 구조로 보장.

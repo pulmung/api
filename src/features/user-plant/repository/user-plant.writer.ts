@@ -26,6 +26,7 @@ export class UserPlantWriter {
         images: userPlant.images,
         adoptedAt: userPlant.adoptedAt,
         memo: userPlant.memo,
+        wateringIntervalDays: userPlant.wateringIntervalDays,
       });
     } catch (e) {
       this.throwIfReferencedPlantMissing(e);
@@ -48,6 +49,8 @@ export class UserPlantWriter {
     if (patch.images !== undefined) set.images = patch.images;
     if (patch.adoptedAt !== undefined) set.adoptedAt = patch.adoptedAt;
     if (patch.memo !== undefined) set.memo = patch.memo;
+    if (patch.wateringIntervalDays !== undefined)
+      set.wateringIntervalDays = patch.wateringIntervalDays;
     // updatedAt은 스키마 $onUpdate가 UPDATE마다 자동으로 SET에 붙인다 — 명시 불필요.
 
     try {

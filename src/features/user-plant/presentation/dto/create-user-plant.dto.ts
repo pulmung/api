@@ -3,6 +3,8 @@ import { z } from 'zod';
 import {
   USER_PLANT_IMAGES_MAX,
   USER_PLANT_NAME_MAX_LENGTH,
+  WATERING_INTERVAL_MAX_DAYS,
+  WATERING_INTERVAL_MIN_DAYS,
 } from '../../domain/user-plant';
 import { UserPlantImageInputSchema } from './user-plant-image-input.schema';
 
@@ -29,6 +31,16 @@ const CreateUserPlantSchema = z.object({
   memo: z.string().trim().min(1).max(1000).optional().meta({
     example: '거실 창가에서 키우는 중',
   }),
+  wateringIntervalDays: z
+    .number()
+    .int()
+    .min(WATERING_INTERVAL_MIN_DAYS)
+    .max(WATERING_INTERVAL_MAX_DAYS)
+    .optional()
+    .meta({
+      description: '물주기 간격(일) — 생략 시 물주기 관리 안 함',
+      example: 7,
+    }),
 });
 
 export class CreateUserPlantDto extends createZodDto(CreateUserPlantSchema) {}

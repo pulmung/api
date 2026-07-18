@@ -19,6 +19,7 @@ export class CreateUserPlantUseCase {
     plantId?: string;
     adoptedAt?: string;
     memo?: string;
+    wateringIntervalDays?: number;
   }): Promise<{ id: string }> {
     // 싼 불변식 먼저 — S3 왕복 전에 도메인에서 거른다.
     const userPlant = UserPlant.create(command);

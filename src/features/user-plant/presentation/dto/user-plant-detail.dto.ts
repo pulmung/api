@@ -25,6 +25,16 @@ const UserPlantDetailSchema = z.object({
     .meta({ description: '연결된 카탈로그 식물 — 미동정이면 null' }),
   adoptedAt: z.iso.date().nullable().meta({ description: '데려온 날' }),
   memo: z.string().nullable(),
+  wateringIntervalDays: z.number().int().nullable().meta({
+    description: '물주기 간격(일) — null = 관리 안 함',
+  }),
+  lastWateredOn: z.iso.date().nullable().meta({
+    description: '마지막 물 준 날 — 기록 없으면 null',
+  }),
+  nextWateringOn: z.iso.date().nullable().meta({
+    description:
+      '다음 물주기 예정일 (lastWateredOn + 간격, 파생) — 간격 또는 기록이 없으면 null',
+  }),
   createdAt: z.iso.datetime(),
 });
 

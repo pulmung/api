@@ -138,6 +138,34 @@ describe('UserPlant (e2e)', () => {
     expect(body.plant).toBeNull();
     expect(body.adoptedAt).toBeNull();
     expect(body.memo).toBeNull();
+    // 물주기 필드 — 미설정 시 전부 null (관리 안 함).
+    expect(body.wateringIntervalDays).toBeNull();
+    expect(body.lastWateredOn).toBeNull();
+    expect(body.nextWateringOn).toBeNull();
+  });
+
+  it('201: wateringIntervalDays 설정 — 기록이 없어 예정일은 아직 null(앵커 없음)', async () => {
+    const { status, body } = await postUserPlants(
+      { name: '초록이', wateringIntervalDays: 7 },
+      accessToken,
+    );
+
+    expect(status).toBe(201);
+    expect(body.wateringIntervalDays).toBe(7);
+    expect(body.lastWateredOn).toBeNull();
+    expect(body.nextWateringOn).toBeNull();
+  });
+
+  it.each([
+    ['0 (최소 미만)', 0],
+    ['366 (최대 초과)', 366],
+    ['1.5 (비정수)', 1.5],
+  ])('400: wateringIntervalDays %s (Zod)', async (_, days) => {
+    const { status } = await postUserPlants(
+      { name: '초록이', wateringIntervalDays: days },
+      accessToken,
+    );
+    expect(status).toBe(400);
   });
 
   it('401: 토큰 없음', async () => {

@@ -30,3 +30,8 @@ export class UserPlantNotFoundError extends DomainError {
   readonly code = 'USER_PLANT_NOT_FOUND';
   readonly status = HttpStatus.NOT_FOUND;
 }
+
+export class InvalidWateringIntervalError extends DomainError {
+  readonly code = 'INVALID_WATERING_INTERVAL';
+  readonly status = HttpStatus.UNPROCESSABLE_ENTITY;
+}

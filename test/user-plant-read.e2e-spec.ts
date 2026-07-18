@@ -164,6 +164,9 @@ describe('UserPlantRead (e2e)', () => {
           },
           plant: { id: catalog.id, name: '몬스테라 알보' },
           adoptedAt: null,
+          wateringIntervalDays: null,
+          lastWateredOn: null,
+          nextWateringOn: null,
           createdAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/) as unknown,
         },
         {
@@ -176,6 +179,9 @@ describe('UserPlantRead (e2e)', () => {
           },
           plant: { id: catalog.id, name: '몬스테라 알보' },
           adoptedAt: '2026-05-01',
+          wateringIntervalDays: null,
+          lastWateredOn: null,
+          nextWateringOn: null,
           createdAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/) as unknown,
         },
         {
@@ -184,6 +190,9 @@ describe('UserPlantRead (e2e)', () => {
           coverImage: null,
           plant: null,
           adoptedAt: null,
+          wateringIntervalDays: null,
+          lastWateredOn: null,
+          nextWateringOn: null,
           createdAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/) as unknown,
         },
       ]);
@@ -273,6 +282,9 @@ describe('UserPlantRead (e2e)', () => {
         plant: { id: catalog.id, name: '몬스테라 알보' },
         adoptedAt: '2026-05-01',
         memo: '거실 창가',
+        wateringIntervalDays: null,
+        lastWateredOn: null,
+        nextWateringOn: null,
         createdAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/) as unknown,
       });
     });

@@ -23,6 +23,7 @@ export class UpdateUserPlantUseCase {
     images?: PlantImage[];
     adoptedAt?: string | null;
     memo?: string | null;
+    wateringIntervalDays?: number | null;
   }): Promise<void> {
     // 싼 불변식 먼저 — S3 왕복 전에 도메인에서 거른다(create와 동일 순서).
     const patch = UserPlantPatch.create(command);

@@ -123,6 +123,9 @@ describe('UserPlantMutation (e2e)', () => {
         plant: null,
         adoptedAt: '2026-05-01',
         memo: '거실 창가',
+        wateringIntervalDays: null,
+        lastWateredOn: null,
+        nextWateringOn: null,
         createdAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/) as unknown,
       });
     });
@@ -160,6 +163,9 @@ describe('UserPlantMutation (e2e)', () => {
         plant: { id: catalog.id, name: '몬스테라 알보' },
         adoptedAt: '2026-06-15',
         memo: '베란다로 이사',
+        wateringIntervalDays: null,
+        lastWateredOn: null,
+        nextWateringOn: null,
         createdAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/) as unknown,
       });
     });
@@ -206,6 +212,39 @@ describe('UserPlantMutation (e2e)', () => {
       const { status, body } = await patchUserPlant(id, { images: [] }, ownerToken);
       expect(status).toBe(200);
       expect(body.images).toEqual([]);
+    });
+
+    it('200: 물주기 간격 설정({wateringIntervalDays: 7}) → null 해제 — 부재(미변경)와 구분', async () => {
+      const id = await insertUserPlant({ wateringIntervalDays: null });
+
+      const set = await patchUserPlant(id, { wateringIntervalDays: 7 }, ownerToken);
+      expect(set.status).toBe(200);
+      expect(set.body.wateringIntervalDays).toBe(7);
+
+      // 무관 필드 패치(부재 = 미변경) — 간격이 유지돼야 한다.
+      const keep = await patchUserPlant(id, { name: '새이름' }, ownerToken);
+      expect(keep.body.wateringIntervalDays).toBe(7);
+
+      const unset = await patchUserPlant(
+        id,
+        { wateringIntervalDays: null },
+        ownerToken,
+      );
+      expect(unset.status).toBe(200);
+      expect(unset.body.wateringIntervalDays).toBeNull();
+    });
+
+    it.each([
+      ['0 (최소 미만)', 0],
+      ['366 (최대 초과)', 366],
+    ])('400: wateringIntervalDays %s (Zod)', async (_, days) => {
+      const id = await insertUserPlant();
+      const { status } = await patchUserPlant(
+        id,
+        { wateringIntervalDays: days },
+        ownerToken,
+      );
+      expect(status).toBe(400);
     });
 
     it('200: updatedAt이 갱신된다 ($onUpdate)', async () => {

@@ -4,11 +4,14 @@ import {
   UserPlantPatch,
   USER_PLANT_IMAGES_MAX,
   USER_PLANT_NAME_MAX_LENGTH,
+  WATERING_INTERVAL_MAX_DAYS,
+  WATERING_INTERVAL_MIN_DAYS,
 } from './user-plant';
 import { PlantImage } from '../../plant/domain/plant-image';
 import {
   InvalidUserPlantImagesError,
   InvalidUserPlantNameError,
+  InvalidWateringIntervalError,
 } from './user-plant.error';
 
 const image = (n: number): PlantImage => ({
@@ -115,6 +118,30 @@ describe('UserPlant.create', () => {
       UserPlant.create({ ...valid, images: [{ key: 'user-plant-image/x.jpg' }] }),
     ).not.toThrow();
   });
+
+  it('wateringIntervalDays 미제공 시 null (물주기 관리 안 함)', () => {
+    expect(UserPlant.create(valid).wateringIntervalDays).toBeNull();
+  });
+
+  it.each([
+    [`${WATERING_INTERVAL_MIN_DAYS}일 (최소)`, WATERING_INTERVAL_MIN_DAYS],
+    [`${WATERING_INTERVAL_MAX_DAYS}일 (최대)`, WATERING_INTERVAL_MAX_DAYS],
+  ])('물주기 간격 경계값 %s 은 통과한다', (_, days) => {
+    expect(
+      UserPlant.create({ ...valid, wateringIntervalDays: days })
+        .wateringIntervalDays,
+    ).toBe(days);
+  });
+
+  it.each([
+    [`${WATERING_INTERVAL_MIN_DAYS - 1} (최소 미만)`, WATERING_INTERVAL_MIN_DAYS - 1],
+    [`${WATERING_INTERVAL_MAX_DAYS + 1} (최대 초과)`, WATERING_INTERVAL_MAX_DAYS + 1],
+    ['1.5 (비정수)', 1.5],
+  ])('물주기 간격이 %s 이면 InvalidWateringIntervalError', (_, days) => {
+    expect(() =>
+      UserPlant.create({ ...valid, wateringIntervalDays: days }),
+    ).toThrow(InvalidWateringIntervalError);
+  });
 });
 
 describe('UserPlantPatch.create', () => {
@@ -142,17 +169,20 @@ describe('UserPlantPatch.create', () => {
     expect(patch.images).toBeUndefined();
     expect(patch.adoptedAt).toBeUndefined();
     expect(patch.memo).toBeUndefined();
+    expect(patch.wateringIntervalDays).toBeUndefined();
   });
 
-  it('null 명시(plantId/adoptedAt/memo)는 null로 남는다 (해제)', () => {
+  it('null 명시(plantId/adoptedAt/memo/wateringIntervalDays)는 null로 남는다 (해제)', () => {
     const patch = UserPlantPatch.create({
       plantId: null,
       adoptedAt: null,
       memo: null,
+      wateringIntervalDays: null,
     });
     expect(patch.plantId).toBeNull();
     expect(patch.adoptedAt).toBeNull();
     expect(patch.memo).toBeNull();
+    expect(patch.wateringIntervalDays).toBeNull();
   });
 
   it('memo가 공백뿐이면 null로 정규화한다 (create와 동일)', () => {
@@ -194,5 +224,16 @@ describe('UserPlantPatch.create', () => {
     expect(() => UserPlantPatch.create({ images: imgs })).toThrow(
       InvalidUserPlantImagesError,
     );
+  });
+
+  // 제공된 간격은 create와 같은 범위 불변식을 통과해야 한다(검증 공유).
+  it.each([
+    [`${WATERING_INTERVAL_MIN_DAYS - 1} (최소 미만)`, WATERING_INTERVAL_MIN_DAYS - 1],
+    [`${WATERING_INTERVAL_MAX_DAYS + 1} (최대 초과)`, WATERING_INTERVAL_MAX_DAYS + 1],
+    ['1.5 (비정수)', 1.5],
+  ])('물주기 간격이 %s 이면 InvalidWateringIntervalError', (_, days) => {
+    expect(() =>
+      UserPlantPatch.create({ wateringIntervalDays: days }),
+    ).toThrow(InvalidWateringIntervalError);
   });
 });

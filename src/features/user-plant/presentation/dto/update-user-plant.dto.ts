@@ -3,6 +3,8 @@ import { z } from 'zod';
 import {
   USER_PLANT_IMAGES_MAX,
   USER_PLANT_NAME_MAX_LENGTH,
+  WATERING_INTERVAL_MAX_DAYS,
+  WATERING_INTERVAL_MIN_DAYS,
 } from '../../domain/user-plant';
 import { UserPlantImageInputSchema } from './user-plant-image-input.schema';
 
@@ -40,6 +42,18 @@ const UpdateUserPlantSchema = z
       description: 'null = 지움',
       example: '거실 창가에서 키우는 중',
     }),
+    wateringIntervalDays: z
+      .number()
+      .int()
+      .min(WATERING_INTERVAL_MIN_DAYS)
+      .max(WATERING_INTERVAL_MAX_DAYS)
+      .nullable()
+      .optional()
+      .meta({
+        description:
+          '물주기 간격(일) — null = 물주기 관리 해제(다음 예정일 계산 off, 기록은 유지)',
+        example: 7,
+      }),
   })
   // 빈 패치는 no-op PATCH = 클라 버그 — 경계에서 400 (drizzle .set({})도 throw라 fail-fast).
   .refine((body) => Object.values(body).some((v) => v !== undefined), {
