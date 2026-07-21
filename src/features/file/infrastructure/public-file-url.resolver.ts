@@ -17,4 +17,14 @@ export class PublicFileUrlResolver {
   resolve(key: string): string {
     return `${this.baseUrl}/${key}`;
   }
+
+  // resolve의 역 — 우리 도메인의 URL이면 key, 아니면 null. 게시글 본문(<img src>)처럼
+  // URL 형태로 돌아오는 입력에서 key를 복원할 때 쓴다. URL↔key 매핑(정·역)을 이 클래스에
+  // 단일 소스로 가둬, base URL이 바뀌어도 역매핑이 조용히 어긋나지 않게 한다.
+  tryParseKey(url: string): string | null {
+    const prefix = `${this.baseUrl}/`;
+    if (!url.startsWith(prefix)) return null;
+    const key = url.slice(prefix.length);
+    return key.length > 0 ? key : null;
+  }
 }

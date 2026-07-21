@@ -111,9 +111,17 @@ testing.md의 "가장 싸게 신뢰를 주는 레벨" 적용:
 | ------------------------------- | --------------------------------------------------------------------------- |
 | 첨부 시점 `head()` 검증 + images jsonb | ✅ 구현됨 (`features/plant` 생성 usecase) — `plants.images` = 단일 jsonb(배열 of `{key, width?, height?}`). 다음 소비처(chat 등)도 같은 패턴 |
 | 이미지 치수                      | 클라 제공값 = 신뢰 불가 힌트(피드 CLS 방지용으론 충분). 진짜 치수는 추후 S3 이벤트→Lambda |
-| 고아 파일 정리                   | S3 lifecycle 규칙 (원장 테이블이 없으니 DB 스윕 없음)                          |
+| 고아 파일 정리                   | ~~S3 lifecycle 규칙~~ → **월간 mark-and-sweep GC**로 대체됨([todo.md](todo.md) 스토리지 항목이 이 줄을 대체 — 트리거 조건도 그쪽 참조) |
 | 원본 파일명 복원(채팅 다운로드)   | 메타를 message jsonb에 + presigned GET `ResponseContentDisposition`            |
 | `PUBLIC_FILE_BASE_URL` (읽기 URL 조합)  | ✅ 구현됨 (`PublicFileUrlResolver` — plant 조회 응답이 사용. private signed URL은 `PRIVATE_FILE_BASE_URL`로 이 축에서 확장) |
+
+### post-image 예외 — 읽기 URL이 본문(HTML)에 구워진다
+
+다른 purpose는 "불투명 key만 저장, URL은 응답 시점 조합"(§1 #2 + `PublicFileUrlResolver`)이지만 **post-image는 명시적 예외다**: 게시글 본문이 HTML이라 `<img src>`에 완성된 읽기 URL이 **저장 시점에** 박힌다. sanitize(`features/post` `processPostContent`)가 우리 도메인(`PUBLIC_FILE_BASE_URL`) + `post-image/` prefix의 src만 통과시키고, URL↔key 역매핑은 `PublicFileUrlResolver.tryParseKey`(resolve의 역)가 단일 소스다.
+
+- **이미지 서빙 도메인은 사실상 불변 계약이 된다** — `PUBLIC_FILE_BASE_URL`을 바꾸면 과거 글 본문을 일괄 재작성해야 한다. CDN/버킷을 이전해도 **도메인은 유지**할 것(우리 소유 고정 도메인 전제).
+- **이 purpose는 private/signed URL 전환 불가** — 만료 있는 URL을 본문에 구울 수 없다. 공개 게시판이라 수용한 트레이드오프(결정 배경: HTML 본문 vs 블록 JSON 논의 → 게시판형 + 완제품 에디터 채택).
+- GC 참조 스캔은 본문 HTML 파싱이 아니라 **쓰기 시점 파생 컬럼 `posts.image_keys`** 를 본다([todo.md](todo.md) 규율 (b)).
 
 ## 7. 인프라 요구 (코드 밖 — 배포 전 체크)
 

@@ -29,4 +29,10 @@ export const FILE_POLICIES: Record<
     allowedContentTypes: ['image/jpeg', 'image/png', 'image/webp'],
     maxSizeBytes: 10 * 1024 * 1024, // 10 MiB
   },
+  // 게시글 본문 인라인 이미지. ⚠️ 이 purpose의 URL은 posts.content(HTML)에 구워진다 —
+  // signed URL 전환 불가(docs/file-upload.md의 고정 도메인 예외).
+  'post-image': {
+    allowedContentTypes: ['image/jpeg', 'image/png', 'image/webp'],
+    maxSizeBytes: 10 * 1024 * 1024, // 10 MiB
+  },
 };
