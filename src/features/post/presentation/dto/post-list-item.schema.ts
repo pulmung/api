@@ -26,5 +26,8 @@ export const PostListItemSchema = z.object({
     })
     .nullable()
     .meta({ description: '태그된 카탈로그 식물 — 무관한 글이면 null' }),
+  commentCount: z.int().min(0).meta({
+    description: '살아있는 댓글 수(루트+답글) — 삭제(soft delete 포함) 즉시 감소',
+  }),
   createdAt: z.iso.datetime(),
 });

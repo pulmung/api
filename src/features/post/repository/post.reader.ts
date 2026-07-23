@@ -11,6 +11,8 @@ const POST_LIST_ROW = {
   title: posts.title,
   excerpt: posts.excerpt,
   thumbnailKey: posts.thumbnailKey,
+  // 비정규화 카운터(증감은 comment.writer 몫) — 목록 표시가 조회 0비용인 이유.
+  commentCount: posts.commentCount,
   createdAt: posts.createdAt,
   // 작성자 요약 — inner join(author_id notNull + onDelete cascade라 항상 존재).
   author: { id: users.id, nickname: users.nickname },

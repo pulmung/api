@@ -12,6 +12,8 @@ export type PostListItem = {
   author: { id: string; nickname: string };
   // 식물 태그 요약 — 무관한 글이면 null.
   plant: { id: string; name: string } | null;
+  // 살아있는 댓글 수(루트+답글) — posts.commentCount 비정규화 컬럼 그대로.
+  commentCount: number;
   createdAt: string;
 };
 export type PostListPage = {
@@ -66,6 +68,7 @@ export class PostQueryService {
     title: string;
     excerpt: string;
     thumbnailKey: string | null;
+    commentCount: number;
     createdAt: Date;
     author: { id: string; nickname: string };
     plant: { id: string; name: string } | null;
@@ -79,6 +82,7 @@ export class PostQueryService {
         : null,
       author: row.author,
       plant: row.plant,
+      commentCount: row.commentCount,
       // z.iso.datetime()은 Date를 거부한다 — 문자열 직렬화는 여기서.
       createdAt: row.createdAt.toISOString(),
     };

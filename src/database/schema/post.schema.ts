@@ -1,4 +1,11 @@
-import { uuid, text, timestamp, index, jsonb } from 'drizzle-orm/pg-core';
+import {
+  uuid,
+  text,
+  timestamp,
+  index,
+  integer,
+  jsonb,
+} from 'drizzle-orm/pg-core';
 import { uuidv7 } from 'uuidv7';
 import { pgTable } from './table';
 import { users } from './user.schema';
@@ -32,9 +39,13 @@ export const FK_POSTS_PLANT = 'fk_posts_plant';
  * 수 있지만, 기준을 id 하나로 통일하는 한 무해하다.)
  *
  * 의도적으로 없는 것 — 전부 도입 시점에 additive:
- * - 좋아요/댓글 카운터: 그 도메인이 생길 때 비정규화 여부까지 포함해 그때 결정.
- * - soft delete: 지금은 하드 삭제(user_plants와 동일). 댓글(스레드 보존)이 생기면 재검토.
+ * - 좋아요 카운터: 그 도메인이 생길 때 비정규화 여부까지 포함해 그때 결정.
  * - 카테고리(게시판 구분): 요구가 생기면 닫힌 enum으로(§9 배포 트레인 기준).
+ *
+ * 재검토가 끝난 것(댓글 도입 시점 결정 — comment.schema.ts doc 참조):
+ * - 댓글 카운터: commentCount로 비정규화(아래 컬럼).
+ * - 글 soft delete: 계속 하드 삭제. 스레드 보존은 댓글 자체의 soft delete가 맡고,
+ *   글 삭제 = 스레드 전체 소멸(comments cascade)이 게시판 관례와 일치한다.
  */
 export const posts = pgTable(
   'posts',
@@ -77,6 +88,11 @@ export const posts = pgTable(
     // ⚠️ GC 스캔 대상에 posts.imageKeys를 추가할 것(todo.md 규율 (b), 현재 목록:
     //    user_plants·plants).
     imageKeys: jsonb().$type<string[]>().notNull(),
+
+    // 살아있는(soft-deleted 제외) 댓글 수(루트+답글) — 목록 표시용 비정규화.
+    // 증감은 comment.writer.ts가 댓글 쓰기와 같은 트랜잭션에서 수행하며, 그때
+    // updatedAt 자기대입으로 $onUpdate를 억제한다(댓글 활동 ≠ 글 수정).
+    commentCount: integer().notNull().default(0),
 
     createdAt: timestamp({ withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp({ withTimezone: true })

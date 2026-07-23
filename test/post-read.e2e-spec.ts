@@ -110,6 +110,7 @@ describe('PostRead (e2e) — 공개 게시판 읽기', () => {
           thumbnailUrl: `${TEST_FILE_BASE_URL}/post-image/thumb.jpg`,
           author: { id: authorAId, nickname: '작가A' },
           plant: { id: catalog.id, name: '몬스테라 알보' },
+          commentCount: 0,
           createdAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/) as unknown,
         },
       ]);
@@ -192,6 +193,7 @@ describe('PostRead (e2e) — 공개 게시판 읽기', () => {
         thumbnailUrl: null,
         author: { id: authorAId, nickname: '작가A' },
         plant: null,
+        commentCount: 0,
         content: '<p>우리집 <strong>몬스테라</strong></p>',
         createdAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/) as unknown,
         updatedAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/) as unknown,
