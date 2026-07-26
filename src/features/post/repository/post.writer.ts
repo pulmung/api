@@ -1,7 +1,9 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { DatabaseError } from 'pg';
-import { and, DrizzleQueryError, eq } from 'drizzle-orm';
-import { DRIZZLE, type DrizzleDB } from '../../../database/drizzle.constants';
+import { and, DrizzleQueryError, eq, sql } from 'drizzle-orm';
+import { TransactionHost } from '@nestjs-cls/transactional';
+import type { DrizzleDB } from '../../../database/drizzle.constants';
+import type { DrizzleTransactionalAdapter } from '../../../database/drizzle-transactional.adapter';
 import { PG_ERROR_CODE } from '../../../database/postgres-error';
 import {
   posts,
@@ -15,7 +17,15 @@ import { ReferencedPlantNotFoundError } from '../domain/post.error';
 
 @Injectable()
 export class PostWriter {
-  constructor(@Inject(DRIZZLE) private readonly db: DrizzleDB) {}
+  constructor(
+    private readonly txHost: TransactionHost<DrizzleTransactionalAdapter>,
+  ) {}
+
+  // 진행 중인 트랜잭션이 있으면 그 핸들을, 없으면 평범한 db를 준다(CLS가 고른다) —
+  // 덕분에 이 어댑터의 쿼리는 트랜잭션 안팎에서 같은 코드로 동작한다.
+  private get db(): DrizzleDB {
+    return this.txHost.tx;
+  }
 
   // 응답은 컨트롤러가 재조회(PostQueryService)로 만든다 — writer는 영속화만.
   async create(post: Post): Promise<void> {
@@ -78,6 +88,40 @@ export class PostWriter {
       .where(and(eq(posts.id, id), eq(posts.authorId, authorId)))
       .returning({ id: posts.id });
     return rows.length > 0;
+  }
+
+  /**
+   * 비정규화 카운터 증감 — 좋아요·댓글 쓰기와 **같은 트랜잭션**에서 호출되어야 한다
+   * (경계는 유스케이스의 `@Transactional()`이 잡는다). posts는 이 어댑터의 테이블이므로
+   * 자식 쪽 writer가 아니라 여기가 소유한다.
+   *
+   * 읽고-더하고-쓰기가 아니라 SQL 식(`like_count + delta`)으로 원자 증감한다 — 동시 좋아요가
+   * 서로를 덮어쓰지 않는 근거이고, E2E의 "다른 유저 동시 좋아요 → 카운터 2"가 이걸 지킨다.
+   * updatedAt 자기대입으로 `$onUpdate`를 억제한다(좋아요·댓글 활동 ≠ 글 수정).
+   *
+   * @returns 갱신된 값. null = 그 글이 없다(호출자가 404로 번역).
+   */
+  async adjustLikeCount(postId: string, delta: 1 | -1): Promise<number | null> {
+    const [row] = await this.db
+      .update(posts)
+      .set({
+        likeCount: sql`${posts.likeCount} + ${delta}`,
+        updatedAt: sql`${posts.updatedAt}`,
+      })
+      .where(eq(posts.id, postId))
+      .returning({ likeCount: posts.likeCount });
+    return row?.likeCount ?? null;
+  }
+
+  /** adjustLikeCount와 같은 규율 — 댓글 쓰기와 같은 트랜잭션에서 호출된다. */
+  async adjustCommentCount(postId: string, delta: 1 | -1): Promise<void> {
+    await this.db
+      .update(posts)
+      .set({
+        commentCount: sql`${posts.commentCount} + ${delta}`,
+        updatedAt: sql`${posts.updatedAt}`,
+      })
+      .where(eq(posts.id, postId));
   }
 
   // FK 위반(23503)을 도메인 예외로 변환 — 사전 SELECT 없음(§7의 23505 패턴과 같은 경로).

@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Header,
   HttpCode,
   HttpStatus,
   Param,
@@ -13,6 +14,7 @@ import {
 import { ApiNoContentResponse } from '@nestjs/swagger';
 import { ZodResponse } from 'nestjs-zod';
 import { Authenticated } from '../../auth/presentation/authenticated.decorator';
+import { OptionalAuth } from '../../auth/presentation/optional-auth.decorator';
 import { CurrentUser } from '../../../common/auth/current-user.decorator';
 import type { AuthUser } from '../../../common/auth/auth-user';
 import { ApiErrors } from '../../../common/swagger/api-errors.decorator';
@@ -69,38 +71,61 @@ export class PostController {
     });
 
     // 생성 201 = 조회 표현(재조회) — 생성/조회 응답의 동일성을 구조로 보장(REST 관례).
-    const post = await this.postQuery.findById(id);
+    // 작성자를 뷰어로 넘긴다 — 응답의 isLiked가 "작성자 본인 기준"이라야 조회와 같은 표현이다.
+    const post = await this.postQuery.findById(id, user.id);
     // 방금 커밋된 행이라 실패는 불변식 위반 — 404가 아니라 500(unexpected)이 정직하다.
     if (!post) throw new Error(`created post not readable: ${id}`);
     return post;
   }
 
-  // 공개 라우트 = 무표시(데코 0) — 게시판은 비로그인 열람 가능(읽기 중심·SEO).
+  // 게시판은 비로그인 열람 가능(읽기 중심·SEO)이라 여전히 공개다. 단 응답에 뷰어별
+  // isLiked가 실리므로 무표시가 아니라 @OptionalAuth — 토큰 없으면 익명 통과(isLiked 전부
+  // false), 토큰이 있는데 잘못됐으면 401(만료를 익명으로 조용히 강등하지 않는다).
   @Get()
+  @OptionalAuth()
+  // 뷰어별 응답이라 공유 캐시 금지 — 없으면 A의 isLiked: true가 B에게 갈 수 있다.
+  // Vary는 "무엇에 따라 갈리는가"의 정확한 신호(중간 캐시가 무시하지 않도록 함께 준다).
+  @Header('Cache-Control', 'private, no-store')
+  @Header('Vary', 'Authorization')
   @ZodResponse({
     status: 200,
     description:
-      '게시글 목록 — 최신순(id DESC) keyset 페이지네이션. plantId/authorId 필터 조합 가능',
+      '게시글 목록 — 최신순(id DESC) keyset 페이지네이션. plantId/authorId 필터 조합 가능. ' +
+      '인증 시 isLiked가 뷰어 기준으로 채워진다. 비로그인(Authorization 헤더 없음)이면 익명 ' +
+      '열람 + isLiked 전부 false. ⚠️ 헤더를 보냈는데 토큰이 만료·손상됐으면 401이다 — ' +
+      '클라의 토큰 갱신 인터셉터가 이 공개 라우트도 커버해야 한다',
     type: PostListDto,
   })
-  async list(@Query() query: PostListQueryDto): Promise<PostListDto> {
+  async list(
+    @Query() query: PostListQueryDto,
+    @CurrentUser() user: AuthUser | undefined,
+  ): Promise<PostListDto> {
     return this.postQuery.findPage({
       cursor: query.cursor,
       limit: query.limit,
       plantId: query.plantId,
       authorId: query.authorId,
+      viewerId: user?.id,
     });
   }
 
   @Get(':id')
+  @OptionalAuth()
+  @Header('Cache-Control', 'private, no-store')
+  @Header('Vary', 'Authorization')
   @ApiErrors(PostNotFoundError)
   @ZodResponse({
     status: 200,
-    description: '게시글 상세 — 공개(비로그인 열람 가능)',
+    description:
+      '게시글 상세 — 공개(비로그인 열람 가능). 인증 시 isLiked가 뷰어 기준으로 채워진다. ' +
+      '목록과 동일하게, 헤더를 보냈는데 토큰이 유효하지 않으면 401',
     type: PostDetailDto,
   })
-  async detail(@Param() params: PostIdParamDto): Promise<PostDetailDto> {
-    const post = await this.postQuery.findById(params.id);
+  async detail(
+    @Param() params: PostIdParamDto,
+    @CurrentUser() user: AuthUser | undefined,
+  ): Promise<PostDetailDto> {
+    const post = await this.postQuery.findById(params.id, user?.id);
     if (!post) throw new PostNotFoundError();
     return post;
   }
@@ -135,8 +160,8 @@ export class PostController {
       plantId: dto.plantId,
     });
 
-    // 수정 200 = 조회 표현(재조회) — POST 201과 동일 패턴.
-    const post = await this.postQuery.findById(params.id);
+    // 수정 200 = 조회 표현(재조회) — POST 201과 동일 패턴(뷰어 = 작성자 본인).
+    const post = await this.postQuery.findById(params.id, user.id);
     // 방금 수정한 행이라 실패는 불변식 위반 — 404가 아니라 500(unexpected)이 정직하다.
     if (!post) throw new Error(`updated post not readable: ${params.id}`);
     return post;

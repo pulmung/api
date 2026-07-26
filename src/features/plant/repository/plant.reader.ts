@@ -1,6 +1,8 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { desc, eq, lt } from 'drizzle-orm';
-import { DRIZZLE, type DrizzleDB } from '../../../database/drizzle.constants';
+import { TransactionHost } from '@nestjs-cls/transactional';
+import type { DrizzleDB } from '../../../database/drizzle.constants';
+import type { DrizzleTransactionalAdapter } from '../../../database/drizzle-transactional.adapter';
 import { plants } from '../../../database/schema';
 
 // 카탈로그 read model의 원천 행 — 목록·단건이 같은 프로젝션 공유(부분 select).
@@ -19,7 +21,15 @@ const PLANT_ROW = {
 // read model 조합(URL·커버·ISO)은 application의 PlantQueryService 몫 — 여기 두지 않는다.
 @Injectable()
 export class PlantReader {
-  constructor(@Inject(DRIZZLE) private readonly db: DrizzleDB) {}
+  constructor(
+    private readonly txHost: TransactionHost<DrizzleTransactionalAdapter>,
+  ) {}
+
+  // 진행 중인 트랜잭션이 있으면 그 핸들을, 없으면 평범한 db를 준다(CLS가 고른다) —
+  // 덕분에 이 어댑터의 쿼리는 트랜잭션 안팎에서 같은 코드로 동작한다.
+  private get db(): DrizzleDB {
+    return this.txHost.tx;
+  }
 
   // keyset 페이지네이션: uuidv7은 선두 48비트가 타임스탬프(바이트 정렬 = 시간 정렬)라
   // id DESC = 최신순이고 PK 인덱스가 그대로 커버한다(추가 인덱스·정렬 키 불필요).

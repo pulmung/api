@@ -1,7 +1,9 @@
-import { Inject, Injectable } from '@nestjs/common';
-import { and, desc, eq, lt } from 'drizzle-orm';
-import { DRIZZLE, type DrizzleDB } from '../../../database/drizzle.constants';
-import { plants, posts, users } from '../../../database/schema';
+import { Injectable } from '@nestjs/common';
+import { and, desc, eq, inArray, lt } from 'drizzle-orm';
+import { TransactionHost } from '@nestjs-cls/transactional';
+import type { DrizzleDB } from '../../../database/drizzle.constants';
+import type { DrizzleTransactionalAdapter } from '../../../database/drizzle-transactional.adapter';
+import { plants, postLikes, posts, users } from '../../../database/schema';
 
 // 게시글 read model의 원천 행 — 부분 select(옵트인). content는 상세 전용이라 목록 제외
 // (본문 50k까지 가능 — 목록에 실으면 페이로드가 터진다). authorId 원시 컬럼 대신
@@ -13,6 +15,8 @@ const POST_LIST_ROW = {
   thumbnailKey: posts.thumbnailKey,
   // 비정규화 카운터(증감은 comment.writer 몫) — 목록 표시가 조회 0비용인 이유.
   commentCount: posts.commentCount,
+  // 같은 결(증감은 post-like.writer 몫). "내가 눌렀는지"는 뷰어별이라 별도 조회다(아래).
+  likeCount: posts.likeCount,
   createdAt: posts.createdAt,
   // 작성자 요약 — inner join(author_id notNull + onDelete cascade라 항상 존재).
   author: { id: users.id, nickname: users.nickname },
@@ -30,7 +34,15 @@ const POST_DETAIL_ROW = {
 // CQRS 읽기의 정상 경로다(read model은 테이블을 횡단한다 — user-plant reader 전례).
 @Injectable()
 export class PostReader {
-  constructor(@Inject(DRIZZLE) private readonly db: DrizzleDB) {}
+  constructor(
+    private readonly txHost: TransactionHost<DrizzleTransactionalAdapter>,
+  ) {}
+
+  // 진행 중인 트랜잭션이 있으면 그 핸들을, 없으면 평범한 db를 준다(CLS가 고른다) —
+  // 덕분에 이 어댑터의 쿼리는 트랜잭션 안팎에서 같은 코드로 동작한다.
+  private get db(): DrizzleDB {
+    return this.txHost.tx;
+  }
 
   // 공개 읽기 — 소유 스코프 없음(게시판). null = 진짜 비존재뿐.
   async findById(id: string) {
@@ -66,5 +78,41 @@ export class PostReader {
       )
       .orderBy(desc(posts.id))
       .limit(params.limit + 1);
+  }
+
+  /**
+   * 좋아요 수 단건 조회 — 멱등 경로(이미 좋아요/좋아요 없음)에서 카운터를 건드리지 않고
+   * 현재 값만 응답에 싣기 위한 것. null = 비존재 글(호출자가 404로 번역).
+   */
+  async findLikeCount(postId: string): Promise<number | null> {
+    const [row] = await this.db
+      .select({ likeCount: posts.likeCount })
+      .from(posts)
+      .where(eq(posts.id, postId));
+    return row?.likeCount ?? null;
+  }
+
+  /**
+   * 이 뷰어가 좋아요한 글 id들 — 페이지 스코프 배치 조회(CommentReader.replyCounts 전례).
+   * idx_post_likes_user(user_id, post_id)가 index-only로 커버한다.
+   *
+   * 왜 본 쿼리에 LEFT JOIN 하지 않나: 뷰어가 없을 때(익명)와 있을 때로 조인·프로젝션이
+   * 갈려 쿼리 빌더가 두 갈래가 된다. 목록당 왕복 1회가 그 복잡도보다 싸다 —
+   * 페이지 크기가 최대 50이라 조회 자체는 인덱스 한 번이다.
+   */
+  async likedPostIds(userId: string, postIds: string[]): Promise<Set<string>> {
+    // inArray는 빈 배열에서 유효한 SQL을 못 만든다 — 호출 전에 거른다(replyCounts 전례).
+    if (postIds.length === 0) return new Set();
+
+    const rows = await this.db
+      .select({ postId: postLikes.postId })
+      .from(postLikes)
+      .where(
+        and(
+          eq(postLikes.userId, userId),
+          inArray(postLikes.postId, postIds),
+        ),
+      );
+    return new Set(rows.map((row) => row.postId));
   }
 }

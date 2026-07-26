@@ -111,6 +111,9 @@ describe('PostRead (e2e) — 공개 게시판 읽기', () => {
           author: { id: authorAId, nickname: '작가A' },
           plant: { id: catalog.id, name: '몬스테라 알보' },
           commentCount: 0,
+          likeCount: 0,
+          // 익명 열람이라 항상 false — 좋아요 상태의 뷰어별 동작은 post-like 스펙에서.
+          isLiked: false,
           createdAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/) as unknown,
         },
       ]);
@@ -194,6 +197,8 @@ describe('PostRead (e2e) — 공개 게시판 읽기', () => {
         author: { id: authorAId, nickname: '작가A' },
         plant: null,
         commentCount: 0,
+        likeCount: 0,
+        isLiked: false,
         content: '<p>우리집 <strong>몬스테라</strong></p>',
         createdAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/) as unknown,
         updatedAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/) as unknown,

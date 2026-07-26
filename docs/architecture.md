@@ -106,6 +106,24 @@ features/<feature>/
 - 두 충돌(닉네임 중복 vs 이미 가입)을 클라가 다르게 처리해야 하면 구분, 아니면 단일 `ConflictError`로 단순화.
 - **모르는 에러는 rethrow** — 삼키지 않는다(필터가 500).
 
+### 7-1. 트랜잭션 경계 — 유스케이스가 소유한다
+
+> **한 줄 요약: "함께 성공하거나 함께 실패한다"는 비즈니스 진술이므로 경계는 유스케이스에 둔다. 어댑터는 트랜잭션을 열지 않고, 전파는 CLS가 한다 — 시그니처에 `tx`를 흘리지 않는다.**
+
+- **어댑터(writer/reader)는 `db.transaction()`을 열지 않는다.** 열면 두 어댑터를 원자적으로 묶을 방법이 사라지고("좋아요 + 알림"처럼 곧 필요해진다), 무엇이 원자적인지가 유스케이스에서 안 보인다.
+- **유스케이스 메서드에 `@Transactional()`**(`@nestjs-cls/transactional`)을 붙인다. 참조 구현: `LikePostUseCase`·`CreateCommentUseCase`.
+  - 이 데코레이터는 `@Authenticated()`와 **같은 모양**이다 — 영향받는 메서드 바로 위에 선언된다. §10이 거부한 "암묵"은 전역 `APP_GUARD`처럼 **멀리 떨어진 선언**이지 메서드 데코레이터가 아니다.
+  - **메서드보다 좁은 범위**가 필요하면(느린 외부 I/O를 트랜잭션 밖에 두어야 할 때 — S3·HTTP·푸시) `txHost.withTransaction(...)`으로 내리거나, 트랜잭션이 필요한 부분만 **private 메서드로 빼서** 거기에 붙인다.
+  - ⚠️ **한 요청에 트랜잭션이 둘 이상 필요하면 바깥 메서드에 붙이면 안 된다.** 예: `DeleteCommentUseCase`는 하드 삭제가 FK 23503으로 실패하면 그 트랜잭션이 abort 상태라 이어서 soft delete를 못 한다 → private `hardDelete`/`softDelete`에 각각 붙이고 분기(catch)는 트랜잭션 **밖**에서 한다.
+- **전파는 AsyncLocalStorage(CLS)** 가 한다. 모든 DB 어댑터는 `TransactionHost<DrizzleTransactionalAdapter>`를 주입받아 `private get db() { return this.txHost.tx; }`로 핸들을 얻는다 — 트랜잭션 안이면 그 핸들, 밖이면 평범한 db다.
+  - ⚠️ **`@Inject(DRIZZLE)`로 db를 직접 받지 말 것.** 그 어댑터는 트랜잭션 안에서 호출돼도 **조용히 트랜잭션 밖에서** 커밋된다(예외가 안 난다). 읽기 어댑터도 예외 없이 `txHost.tx`를 쓴다 — 트랜잭션 안의 읽기가 자기 쓰기를 못 보면 안 되므로.
+  - ✅ **크론·큐 등 HTTP 밖에서도 그냥 쓰면 된다** — `withTransaction`이 내부에서 `cls.run()`으로 컨텍스트를 직접 만든다(진입점을 감쌀 필요 없음). HTTP 미들웨어 mount는 CLS의 *다른* 용도(요청 스코프 데이터)를 위한 것이지 트랜잭션의 전제가 아니다.
+  - ⚠️ **대신 async 컨텍스트를 벗어나는 코드는 조용히 트랜잭션 밖으로 샌다** — `setTimeout`·이벤트 리스너·await 안 한 promise 안에서 어댑터를 호출하면 `cls.isActive()`가 false라 fallback(비트랜잭션) 핸들을 받는다. 예외가 아니라 **침묵**이다. 트랜잭션이 필수인 경로엔 `@Transactional(Propagation.Mandatory)`를 붙여 fail-closed로 만들 수 있다.
+- **테이블 소유권**: 카운터 같은 비정규화 컬럼은 **그 테이블을 소유한 writer**가 쓴다(`posts.commentCount`·`likeCount` → `PostWriter`). 자식 쪽 writer가 부모 테이블을 직접 UPDATE하지 않는다. 경계를 넘겨 쓰면 모듈 `imports`/`exports`로 드러낸다(§3) — 예: `CommentModule imports PostModule`.
+- **카운터는 읽고-쓰기가 아니라 SQL 식**으로 증감한다(`sql\`${posts.likeCount} + ${delta}\``). 앱에서 read-modify-write 하면 동시 요청이 서로를 덮어쓴다.
+- **어댑터가 트랜잭션을 열지 않는다는 계약은 테스트가 지킨다**: `test/transactional.e2e-spec.ts`가 "`@Transactional` 메서드가 던지면 롤백된다"를 검증한다. 이게 없으면 CLS 배선이 죽어도 모든 테스트가 통과한다(각 쓰기가 따로 커밋될 뿐 최종 상태가 같아서) — **침묵하는 실패**라 전용 테스트가 필수다.
+- **drizzle 어댑터는 직접 구현**(`src/database/drizzle-transactional.adapter.ts`) — 공식 `@nestjs-cls/transactional-adapter-drizzle-orm`은 peer가 `drizzle-orm@^0`이라 우리 v1.0 RC를 지원하지 않는다. 공식 어댑터가 v1을 지원하면 교체.
+
 ---
 
 ## 8. 외부 연동 (어댑터)
@@ -142,7 +160,10 @@ features/<feature>/
 - **무상태 검증**: 서명 + 만료 + **알고리즘 고정(`algorithms: ['HS256']`)** 만 확인하고 `sub`를 신뢰 → `req.user = { id }`. 매 요청 DB 조회 없음(폐기/밴은 refresh 경계의 DB 세션이 책임 — access는 짧게 산다). 실패는 형태 불문 **단일 `UnauthenticatedError`(401)** 로 통일(만료/위조 구분 안 함 = oracle 회피). `sub`가 문자열이 아니면 거부.
 - **가드는 opt-in — 전역 `APP_GUARD`가 아니다**(§13). 라우트에 데코레이터로 붙인다(`features/auth/presentation/`):
   - `@Authenticated()` = `UseGuards(JwtAuthGuard)` + `@ApiBearerAuth()` + `@ApiErrors(UnauthenticatedError)` 합성 → **가드(enforcement) + OpenAPI 문서**를 한 데코로. 보호 라우트에.
-  - `@OptionalAuth()` = 위 + `SetMetadata(IS_OPTIONAL_AUTH_KEY)` → 토큰 없으면 익명 통과, 있으면 검증(잘못됐으면 401).
+  - `@OptionalAuth()` = `UseGuards(JwtAuthGuard)` + `SetMetadata(IS_OPTIONAL_AUTH_KEY)` + `@ApiErrors(UnauthenticatedError)` + **`@ApiOperation({ security: [{}, { bearer: [] }] })`** → 토큰 없으면 익명 통과, 있으면 검증(잘못됐으면 401). 참조 구현: `GET /posts`·`GET /posts/:id`(뷰어별 `isLiked`).
+    - ⚠️ 여기서만 `@ApiBearerAuth()`를 쓰지 않는다 — 그건 `security: [{ bearer: [] }]`(= **인증 필수**)를 내보내 공개 라우트를 거짓말하게 만들고, codegen이 토큰을 필수 인자로 뽑는다. 빈 요구사항 `{}`를 **먼저** 둔 배열이 "무인증도 허용"의 OpenAPI 표기다(§9 계약 정확성).
+    - ⚠️ 가드는 **헤더가 아예 없을 때만** 익명 통과시킨다. 헤더를 보냈는데 만료·손상이면 401이다(만료를 익명으로 조용히 강등하지 않는다) → 클라의 토큰 갱신 인터셉터가 이 "공개" 라우트도 커버해야 한다.
+    - ⚠️ 응답이 뷰어별로 갈리므로 해당 라우트엔 `Cache-Control: private, no-store` + `Vary: Authorization`이 함께 간다 — 없으면 공유 캐시가 A의 응답을 B에게 준다.
   - **공개 라우트 = 무표시**(데코 0). → 라우트당 데코 하나, 공개는 clean, 이중 애노테이션 0.
 - **왜 opt-in인가**: 전역 가드(secure-by-default)면 ① 공개마다 `@Public` opt-out + 보호마다 문서용 데코 = **이중 애노테이션**, ② 보호가 컨트롤러에 안 보이는 **암묵 동작**이 생긴다(명시 > 마법). 인증은 라우트마다 공개/보호/선택이 갈리는 **라우트 단위 결정**이라 opt-in.
   - ⚠️ **트레이드오프**: opt-in은 `@Authenticated` 누락 시 **fail-open**(전역 가드는 fail-closed). "의도치 않게 열린 라우트 없음" 불변식을 **리뷰 + (라우트가 늘면) allowlist 테스트**로 지킨다 — 전역 가드가 *구조로* 준다면 opt-in은 *테스트로* 준다.

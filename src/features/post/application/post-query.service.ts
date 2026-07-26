@@ -14,6 +14,11 @@ export type PostListItem = {
   plant: { id: string; name: string } | null;
   // 살아있는 댓글 수(루트+답글) — posts.commentCount 비정규화 컬럼 그대로.
   commentCount: number;
+  // posts.likeCount 비정규화 컬럼 그대로 — 뷰어와 무관한 전역 수치.
+  likeCount: number;
+  // 뷰어별 값 — 이 응답을 받는 사람이 좋아요했는지. 익명 뷰어면 항상 false.
+  // ⚠️ 이 필드 때문에 목록/상세 응답은 뷰어마다 다르다 → 공유 캐시 금지(컨트롤러의 헤더).
+  isLiked: boolean;
   createdAt: string;
 };
 export type PostListPage = {
@@ -26,6 +31,9 @@ export type PostDetail = PostListItem & {
   updatedAt: string;
 };
 
+// 익명 뷰어용 상수 — 매 요청 빈 Set을 새로 만들지 않는다(읽기 전용으로만 쓴다).
+const EMPTY_LIKED_IDS: ReadonlySet<string> = new Set();
+
 // 읽기 조합 레이어(CQRS의 쿼리 핸들러 자리) — reader(DB 행)와 file 어댑터(URL)를
 // read model로 빚는다. POST 201·PATCH 200 재조회와 GET :id가 같은 표현을 공유한다.
 @Injectable()
@@ -35,44 +43,67 @@ export class PostQueryService {
     private readonly urlResolver: PublicFileUrlResolver,
   ) {}
 
+  // viewerId 없음 = 익명 뷰어(공개 열람) → isLiked는 전부 false.
   async findPage(params: {
     cursor?: string;
     limit: number;
     plantId?: string;
     authorId?: string;
+    viewerId?: string;
   }): Promise<PostListPage> {
     // reader는 hasMore 판별용 limit+1행까지 준다(n+1) — 끝 감지에 COUNT 불필요.
     const rows = await this.reader.findPageRows(params);
     const hasMore = rows.length > params.limit;
     const page = hasMore ? rows.slice(0, params.limit) : rows;
 
+    // 페이지의 글 id들로 좋아요 여부 1쿼리 배치 조회 — 조립은 reader가 아니라 여기
+    // (comment의 replyCounts와 같은 결). 익명이면 쿼리 자체를 내지 않는다.
+    const likedIds = await this.likedIdsFor(
+      params.viewerId,
+      page.map((row) => row.id),
+    );
+
     return {
-      posts: page.map((row) => this.toListItem(row)),
+      posts: page.map((row) => this.toListItem(row, likedIds.has(row.id))),
       nextCursor: hasMore ? page[page.length - 1].id : null,
     };
   }
 
-  async findById(id: string): Promise<PostDetail | null> {
+  async findById(id: string, viewerId?: string): Promise<PostDetail | null> {
     const row = await this.reader.findById(id);
     if (!row) return null;
 
+    const likedIds = await this.likedIdsFor(viewerId, [id]);
+
     return {
-      ...this.toListItem(row),
+      ...this.toListItem(row, likedIds.has(id)),
       content: row.content,
       updatedAt: row.updatedAt.toISOString(),
     };
   }
 
-  private toListItem(row: {
-    id: string;
-    title: string;
-    excerpt: string;
-    thumbnailKey: string | null;
-    commentCount: number;
-    createdAt: Date;
-    author: { id: string; nickname: string };
-    plant: { id: string; name: string } | null;
-  }): PostListItem {
+  private async likedIdsFor(
+    viewerId: string | undefined,
+    postIds: string[],
+  ): Promise<ReadonlySet<string>> {
+    if (!viewerId) return EMPTY_LIKED_IDS;
+    return this.reader.likedPostIds(viewerId, postIds);
+  }
+
+  private toListItem(
+    row: {
+      id: string;
+      title: string;
+      excerpt: string;
+      thumbnailKey: string | null;
+      commentCount: number;
+      likeCount: number;
+      createdAt: Date;
+      author: { id: string; nickname: string };
+      plant: { id: string; name: string } | null;
+    },
+    isLiked: boolean,
+  ): PostListItem {
     return {
       id: row.id,
       title: row.title,
@@ -83,6 +114,8 @@ export class PostQueryService {
       author: row.author,
       plant: row.plant,
       commentCount: row.commentCount,
+      likeCount: row.likeCount,
+      isLiked,
       // z.iso.datetime()은 Date를 거부한다 — 문자열 직렬화는 여기서.
       createdAt: row.createdAt.toISOString(),
     };

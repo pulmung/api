@@ -1,8 +1,10 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { DatabaseError } from 'pg';
 import { and, DrizzleQueryError, eq, exists, sql } from 'drizzle-orm';
 import { uuidv7 } from 'uuidv7';
-import { DRIZZLE, type DrizzleDB } from '../../../database/drizzle.constants';
+import { TransactionHost } from '@nestjs-cls/transactional';
+import type { DrizzleDB } from '../../../database/drizzle.constants';
+import type { DrizzleTransactionalAdapter } from '../../../database/drizzle-transactional.adapter';
 import { PG_ERROR_CODE } from '../../../database/postgres-error';
 import {
   userPlants,
@@ -13,7 +15,15 @@ import { UserPlantNotFoundError } from '../domain/user-plant.error';
 
 @Injectable()
 export class WateringWriter {
-  constructor(@Inject(DRIZZLE) private readonly db: DrizzleDB) {}
+  constructor(
+    private readonly txHost: TransactionHost<DrizzleTransactionalAdapter>,
+  ) {}
+
+  // 진행 중인 트랜잭션이 있으면 그 핸들을, 없으면 평범한 db를 준다(CLS가 고른다) —
+  // 덕분에 이 어댑터의 쿼리는 트랜잭션 안팎에서 같은 코드로 동작한다.
+  private get db(): DrizzleDB {
+    return this.txHost.tx;
+  }
 
   /**
    * 소유 스코프 INSERT...SELECT — user_plants의 WHERE(id + owner)가 통과한 행에서만

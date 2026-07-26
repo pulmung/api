@@ -1,5 +1,7 @@
-import { Inject, Injectable } from '@nestjs/common';
-import { DRIZZLE, type DrizzleDB } from '../../../database/drizzle.constants';
+import { Injectable } from '@nestjs/common';
+import { TransactionHost } from '@nestjs-cls/transactional';
+import type { DrizzleDB } from '../../../database/drizzle.constants';
+import type { DrizzleTransactionalAdapter } from '../../../database/drizzle-transactional.adapter';
 import { User } from '../domain/user';
 import {
   UNIQUE_USERS_NICKNAME,
@@ -17,7 +19,15 @@ import { PG_ERROR_CODE } from '../../../database/postgres-error';
 
 @Injectable()
 export class UserWriter {
-  constructor(@Inject(DRIZZLE) private readonly db: DrizzleDB) {}
+  constructor(
+    private readonly txHost: TransactionHost<DrizzleTransactionalAdapter>,
+  ) {}
+
+  // 진행 중인 트랜잭션이 있으면 그 핸들을, 없으면 평범한 db를 준다(CLS가 고른다) —
+  // 덕분에 이 어댑터의 쿼리는 트랜잭션 안팎에서 같은 코드로 동작한다.
+  private get db(): DrizzleDB {
+    return this.txHost.tx;
+  }
 
   async create(user: User) {
     try {

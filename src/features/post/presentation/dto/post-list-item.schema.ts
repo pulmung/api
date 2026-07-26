@@ -29,5 +29,13 @@ export const PostListItemSchema = z.object({
   commentCount: z.int().min(0).meta({
     description: '살아있는 댓글 수(루트+답글) — 삭제(soft delete 포함) 즉시 감소',
   }),
+  likeCount: z.int().min(0).meta({
+    description: '좋아요 수 — 뷰어와 무관한 전역 수치',
+  }),
+  isLiked: z.boolean().meta({
+    description:
+      '이 응답을 받는 사람이 좋아요했는지 — 비로그인 열람이면 항상 false. ' +
+      '뷰어별 값이라 이 응답은 공유 캐시에 담기지 않는다(Cache-Control: private)',
+  }),
   createdAt: z.iso.datetime(),
 });

@@ -5,3 +5,4 @@ export * from './user-plant.schema';
 export * from './watering.schema';
 export * from './post.schema';
 export * from './comment.schema';
+export * from './post-like.schema';

@@ -39,11 +39,12 @@ export const FK_POSTS_PLANT = 'fk_posts_plant';
  * 수 있지만, 기준을 id 하나로 통일하는 한 무해하다.)
  *
  * 의도적으로 없는 것 — 전부 도입 시점에 additive:
- * - 좋아요 카운터: 그 도메인이 생길 때 비정규화 여부까지 포함해 그때 결정.
  * - 카테고리(게시판 구분): 요구가 생기면 닫힌 enum으로(§9 배포 트레인 기준).
  *
- * 재검토가 끝난 것(댓글 도입 시점 결정 — comment.schema.ts doc 참조):
+ * 재검토가 끝난 것(각 도메인 도입 시점 결정 — comment.schema.ts·post-like.schema.ts doc 참조):
  * - 댓글 카운터: commentCount로 비정규화(아래 컬럼).
+ * - 좋아요 카운터: likeCount로 비정규화(아래 컬럼) — 목록 표시가 확정 수요라 commentCount와
+ *   동일 계산. 라이브 COUNT는 목록 페이지마다 N회 집계라 비정규화의 관리 비용이 더 싸다.
  * - 글 soft delete: 계속 하드 삭제. 스레드 보존은 댓글 자체의 soft delete가 맡고,
  *   글 삭제 = 스레드 전체 소멸(comments cascade)이 게시판 관례와 일치한다.
  */
@@ -93,6 +94,11 @@ export const posts = pgTable(
     // 증감은 comment.writer.ts가 댓글 쓰기와 같은 트랜잭션에서 수행하며, 그때
     // updatedAt 자기대입으로 $onUpdate를 억제한다(댓글 활동 ≠ 글 수정).
     commentCount: integer().notNull().default(0),
+
+    // 좋아요 수 — 목록 표시용 비정규화(commentCount와 같은 결). 증감은 좋아요 쓰기
+    // 어댑터가 post_likes INSERT/DELETE와 같은 트랜잭션에서 수행하며, 그때 updatedAt
+    // 자기대입으로 $onUpdate를 억제한다(좋아요 활동 ≠ 글 수정). post-like.schema.ts doc 참조.
+    likeCount: integer().notNull().default(0),
 
     createdAt: timestamp({ withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp({ withTimezone: true })

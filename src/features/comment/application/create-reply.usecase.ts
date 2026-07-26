@@ -1,4 +1,6 @@
 import { Injectable } from '@nestjs/common';
+import { Transactional } from '@nestjs-cls/transactional';
+import { PostWriter } from '../../post/repository/post.writer';
 import { Comment } from '../domain/comment';
 import {
   CommentNotFoundError,
@@ -12,8 +14,12 @@ export class CreateReplyUseCase {
   constructor(
     private readonly commentReader: CommentReader,
     private readonly commentWriter: CommentWriter,
+    private readonly postWriter: PostWriter,
   ) {}
 
+  // 부모 분류(읽기)까지 트랜잭션에 포함한다 — 인덱스 단건 조회라 구간이 짧고, 검증에서
+  // 던지면 아무것도 안 한 채 롤백된다. 느린 외부 I/O가 섞이면 그때 범위를 좁힌다.
+  @Transactional()
   async execute(command: {
     parentId: string;
     authorId: string;
@@ -37,7 +43,8 @@ export class CreateReplyUseCase {
     });
     // 사전 분류와 INSERT 사이의 race는 FK가 닫는다: 부모 하드 삭제 → 23503 → 404.
     // (soft delete와의 틈새는 수용 — "삭제 직전 도착"과 동치, 카운터 정합.)
-    await this.commentWriter.create(reply);
+    await this.commentWriter.insert(reply);
+    await this.postWriter.adjustCommentCount(reply.postId, 1);
     return { id: reply.id };
   }
 }

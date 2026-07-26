@@ -1,7 +1,9 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { and, asc, count, eq, gt, inArray, isNull, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
-import { DRIZZLE, type DrizzleDB } from '../../../database/drizzle.constants';
+import { TransactionHost } from '@nestjs-cls/transactional';
+import type { DrizzleDB } from '../../../database/drizzle.constants';
+import type { DrizzleTransactionalAdapter } from '../../../database/drizzle-transactional.adapter';
 import { comments, posts, users } from '../../../database/schema';
 
 // 멘션된 유저 join용 별칭 — author(users)와 같은 테이블을 한 쿼리에서 두 번 조인한다.
@@ -32,7 +34,15 @@ const COMMENT_DETAIL_ROW = {
 // CQRS 읽기의 정상 경로다(post reader 전례).
 @Injectable()
 export class CommentReader {
-  constructor(@Inject(DRIZZLE) private readonly db: DrizzleDB) {}
+  constructor(
+    private readonly txHost: TransactionHost<DrizzleTransactionalAdapter>,
+  ) {}
+
+  // 진행 중인 트랜잭션이 있으면 그 핸들을, 없으면 평범한 db를 준다(CLS가 고른다) —
+  // 덕분에 이 어댑터의 쿼리는 트랜잭션 안팎에서 같은 코드로 동작한다.
+  private get db(): DrizzleDB {
+    return this.txHost.tx;
+  }
 
   // 단건 조회 — soft-deleted 제외(표적 연산에 소멸한 리소스). null = 비존재·삭제됨.
   async findById(id: string) {

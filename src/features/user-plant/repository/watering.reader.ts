@@ -1,6 +1,8 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { and, desc, eq, lt } from 'drizzle-orm';
-import { DRIZZLE, type DrizzleDB } from '../../../database/drizzle.constants';
+import { TransactionHost } from '@nestjs-cls/transactional';
+import type { DrizzleDB } from '../../../database/drizzle.constants';
+import type { DrizzleTransactionalAdapter } from '../../../database/drizzle-transactional.adapter';
 import { userPlants, waterings } from '../../../database/schema';
 
 // 물주기 기록 read model — createdAt 제외(클라 요구 없음). 두 필드 모두 문자열
@@ -12,7 +14,15 @@ const WATERING_ROW = {
 
 @Injectable()
 export class WateringReader {
-  constructor(@Inject(DRIZZLE) private readonly db: DrizzleDB) {}
+  constructor(
+    private readonly txHost: TransactionHost<DrizzleTransactionalAdapter>,
+  ) {}
+
+  // 진행 중인 트랜잭션이 있으면 그 핸들을, 없으면 평범한 db를 준다(CLS가 고른다) —
+  // 덕분에 이 어댑터의 쿼리는 트랜잭션 안팎에서 같은 코드로 동작한다.
+  private get db(): DrizzleDB {
+    return this.txHost.tx;
+  }
 
   // 멱등 재기록 경로 — 유니크 (userPlantId, wateredOn)로 기존 행 조회.
   // owner join 스코프: 행 존재만으로는 "내 것"이 증명되지 않는다(타인 개체면 404여야 함).

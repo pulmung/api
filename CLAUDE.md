@@ -93,6 +93,7 @@ src/features/<feature>/
 ```
 
 - 의존 방향: `presentation → application → domain ← infra`. 모듈 간 횡단은 **"사용 → 소유"** 한 방향 (예: `auth → user`).
+- **트랜잭션 경계는 유스케이스가 소유한다** — 유스케이스 메서드에 `@Transactional()`, 어댑터는 `db.transaction()`을 열지 않고 `TransactionHost`로 핸들을 받는다. ⚠️ 새 DB 어댑터를 만들 때 `@Inject(DRIZZLE)`을 쓰면 트랜잭션을 조용히 벗어난다 (상세·함정은 [@docs/architecture.md](docs/architecture.md) §7-1).
 - 엔티티는 "가장 오래 책임지는 컨텍스트"가 소유한다 (예: `User` = user). 경계를 넘겨 쓰려면 `exports`로 공개.
 
 ---

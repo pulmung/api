@@ -1,6 +1,8 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { and, desc, eq, lt, sql } from 'drizzle-orm';
-import { DRIZZLE, type DrizzleDB } from '../../../database/drizzle.constants';
+import { TransactionHost } from '@nestjs-cls/transactional';
+import type { DrizzleDB } from '../../../database/drizzle.constants';
+import type { DrizzleTransactionalAdapter } from '../../../database/drizzle-transactional.adapter';
 import { plants, userPlants, waterings } from '../../../database/schema';
 
 // 마지막 물 준 날 — 상관 스칼라 서브쿼리. "다음 예정일" 파생(query service)의 원료로,
@@ -48,7 +50,15 @@ const USER_PLANT_LIST_ROW = {
 // 쿼리)는 순수성 의례일 뿐. 쓰기 쪽 결합은 이미 FK가 DB 레벨에서 갖고 있다.
 @Injectable()
 export class UserPlantReader {
-  constructor(@Inject(DRIZZLE) private readonly db: DrizzleDB) {}
+  constructor(
+    private readonly txHost: TransactionHost<DrizzleTransactionalAdapter>,
+  ) {}
+
+  // 진행 중인 트랜잭션이 있으면 그 핸들을, 없으면 평범한 db를 준다(CLS가 고른다) —
+  // 덕분에 이 어댑터의 쿼리는 트랜잭션 안팎에서 같은 코드로 동작한다.
+  private get db(): DrizzleDB {
+    return this.txHost.tx;
+  }
 
   // owner 스코프 — 타인 개체는 비존재와 동일하게 null(존재 은닉, 404 하나로 수렴).
   async findById(id: string, ownerId: string) {
