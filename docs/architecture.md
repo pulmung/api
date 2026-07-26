@@ -34,7 +34,7 @@ presentation → application → domain ← (repository | infrastructure)
 | **repository / infrastructure** | 바깥세상 어댑터(DB·HTTP·JWT) | domain을 구현/참조 |
 | **presentation** | HTTP 입출력(controller·dto·filter) | application |
 
-- **리트머스**: domain 파일이 인프라를 import하면 설계 오류다. ORM enum조차 **도메인이 소유**하고 스키마가 거꾸로 참조한다(DIP). 예: `SocialProvider`는 `user/domain`이 소유, `user.schema.ts`가 import.
+- **리트머스**: domain 파일이 인프라를 import하면 설계 오류다. ORM enum조차 **도메인이 소유**하고 스키마가 거꾸로 참조한다(DIP). 예: `SocialProvider`는 `user/domain`이 소유, `user.table.ts`가 import.
 
 ---
 
@@ -136,13 +136,25 @@ features/<feature>/
 
 ## 9. DTO & presentation
 
-- **endpoint별 작은 파일.** 모듈 거대 묶음(`auth.request.ts`에 전부)·`request/`·`response/` 폴더 분리 금지(feature-first 역행). 분류가 필요하면 폴더가 아니라 **파일명 suffix**.
+- **endpoint별 작은 파일.** 모듈 거대 묶음(`auth.request.ts`에 전부) 금지(feature-first 역행).
+- **`presentation/`은 두 폴더로 나눈다 — 축은 "방향"이 아니라 "소유권"이다.**
+
+  | 폴더 | 담는 것 | 판정 질문 |
+  | --- | --- | --- |
+  | `dto/` | **엔드포인트 계약** — 라우트 1개가 소유 (`create-plant.dto.ts`) | 이 라우트가 사라지면 같이 사라지나? |
+  | `shared/` | **공유 계약 조각** — 여러 엔드포인트(또는 여러 feature)가 공유 (`plant-image.schema.ts`·`device.fields.ts`) | 여러 곳이 이걸 import하나? |
+
+  - ⚠️ **`request/`·`response/` 폴더 분리 금지.** 방향은 나누는 축이 아니다 — ① 탐색 질문은 "POST /plants 계약 어디?"이지 "응답들 어디?"가 아니고, ② 실제 파일이 방향으로 안 갈린다(`plant-detail.dto.ts` = param+response, `plant-list.dto.ts` = query+response, `plant-category.schema.ts` = 요청·응답 양쪽) → `param/`·`query/`·`shared/`로 새고, 유지하려면 파일을 쪼개야 해서 **파일 수가 되레 는다**. 같은 이유로 `.request.ts`/`.response.ts` 접미사도 안 쓴다(추가로 `create-plant.dto.ts` ↔ `create-plant.usecase.ts` 스템 짝을 잃는다).
+  - `shared/`는 **그 feature가 공개하는 계약 표면**이다 — 남의 feature가 import해도 되는 건 여기 있는 것뿐(§3의 `exports`가 DI 없는 zod 스키마에서 갖는 형태). 경로에 `.../plant/presentation/shared/plant-image.schema`가 찍히면 "공개된 걸 쓴다"가 읽힌다. `dto/`를 가로질러 import하면 그건 경계 위반 신호다.
+  - **조각의 소유 feature = "이 모양이 바뀌는 계기를 가진 쪽"**. 예: `UserSummarySchema`(작성자·멘션 표시용 `{id, nickname}`)는 comment가 아니라 **user** 소유 — 바뀌는 계기가 "유저를 어떻게 요약하나"이지 댓글의 사정이 아니다. 소비처(comment·post)에 두면 옆 feature가 같은 모양을 인라인 복제한다(실제 발생 사례).
+  - 파일명 suffix가 종류를 마저 구분한다: `.dto.ts`(=`createZodDto` 클래스) / `.schema.ts`(=zod 객체·enum) / `.field(s).ts`(=필드 조각). 여기서 `.schema.ts`는 **zod 전용**이다 — DB 테이블 정의는 `.table.ts`를 쓴다([CLAUDE.md](../CLAUDE.md) "테이블 정의 파일"). 같은 접미사를 쓰면 리소스명이 겹칠 때 Cmd+P가 두 레이어를 섞어 보여준다(실제 발생: `watering.schema.ts`). ⚠️ **`.schema.ts`가 `Dto` 클래스를 export하면 분류 실패 신호** — 그건 엔드포인트 계약이므로 `dto/*.dto.ts`다.
 - **응답 공유 기준 = "변경 이유가 같은가"**. 같으면 공유(`AuthTokensDto`를 login/signup/refresh가), 다르면 분리.
 - **생성(POST) 201 응답 = 그 리소스의 조회 표현**(REST 관례: 201 body ≒ GET 표현). 별도 "생성 응답 DTO"를 만들지 않고 조회 DTO를 재사용하며, 컨트롤러가 생성 직후 reader로 재조회해 반환한다 — 쿼리 1개를 내고 생성/조회 표현의 이원화를 구조적으로 차단. (예: POST /plants·GET /plants/:id가 `PlantDetailDto` 공유.)
 - 모듈 간 응답 중첩 회피 → 순환 방지장치(`base.response`)가 애초에 불필요. 각 DTO는 자기 endpoint의 계약(optional 떡칠 만능 DTO 금지 = 거짓말 금지).
 - nestjs-zod: 요청 `createZodDto` + 글로벌 `ZodValidationPipe`. 응답 **`@ZodResponse`**(직렬화 + OpenAPI 문서 + 컴파일 반환검증, 공식 권장 / `@ZodSerializerDto`보다 우위). 문서화는 `.meta({ description, example })` / `.describe()`.
 - **셀렉트박스/상수 목록의 공급 기준 = "변경이 어느 배포 트레인을 타는가"**: 코드 배포와 함께만 변하는 **닫힌 enum**(예: `plantCategories`)은 런타임 API를 만들지 않는다 — 스펙의 enum → codegen으로 전달. 운영 중 배포 없이 변하는 **열린 사전**(예: genera/species, admin 큐레이션)은 reference-data 조회 API로 전달. 사용처 개수는 판단 축이 아니다.
-- **여러 DTO가 공유하는 enum은 named component로**: 공유 zod 스키마 **단일 인스턴스**에 `.meta({ id: 'XxxYyy' })` → `cleanupOpenApiDoc`이 `components.schemas`로 호이스팅하고 사용처를 `$ref`로 바꾼다. DTO마다 `z.enum(...)`을 따로 만들면 스펙에 인라인 복제 → codegen이 익명 타입을 여러 개 생성. ⚠️ `.meta({ id })` 인스턴스가 둘이면 duplicate-id 에러 — 반드시 한 파일에서 export해 재사용. (참조 구현: `features/plant/presentation/dto/plant-category.schema.ts` — zod ≥4.4 × nestjs-zod 5.4의 input 쪽 리네임 드리프트 주석 포함.)
+- **여러 DTO가 공유하는 enum은 named component로**: 공유 zod 스키마 **단일 인스턴스**에 `.meta({ id: 'XxxYyy' })` → `cleanupOpenApiDoc`이 `components.schemas`로 호이스팅하고 사용처를 `$ref`로 바꾼다. DTO마다 `z.enum(...)`을 따로 만들면 스펙에 인라인 복제 → codegen이 익명 타입을 여러 개 생성. ⚠️ `.meta({ id })` 인스턴스가 둘이면 duplicate-id 에러 — 반드시 한 파일에서 export해 재사용. (참조 구현: `features/plant/presentation/shared/plant-category.schema.ts` — zod ≥4.4 × nestjs-zod 5.4의 input 쪽 리네임 드리프트 주석 포함.)
+  - ⚠️ `shared/`에 있다고 전부 named component는 아니다. **파생 베이스**(`PostListItemSchema` — 상세가 `.extend`로 파생)나 **인라인 전개로 충분한 조각**(`UserSummarySchema`)은 `.meta({ id })`를 안 붙인다 — 붙이면 스펙에 `$ref`로 호이스팅돼 프론트 codegen 타입 표면이 바뀐다. 즉 `shared/`(=코드 재사용 단위)와 named component(=스펙 재사용 단위)는 **다른 판단**이다.
 - `additionalProperties: false`("forbidden")는 **정상이자 자산** — 정확한 계약 + 누출 방지 + codegen 정확성. 유지.
 
 ---

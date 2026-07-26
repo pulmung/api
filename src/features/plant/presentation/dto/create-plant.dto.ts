@@ -1,6 +1,6 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
-import { PlantCategorySchema } from './plant-category.schema';
+import { PlantCategorySchema } from '../shared/plant-category.schema';
 import { PLANT_IMAGES_MAX, PLANT_NAME_MAX_LENGTH } from '../../domain/plant';
 
 const CreatePlantSchema = z.object({

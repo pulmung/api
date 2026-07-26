@@ -1,6 +1,6 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
-import { PostListItemSchema } from './post-list-item.schema';
+import { PostListItemSchema } from '../shared/post-list-item.schema';
 
 const PostListQuerySchema = z.object({
   // keyset 커서 = 이전 페이지 마지막 글 id (Stripe식 plain id — 정렬이 id DESC 하나뿐이라

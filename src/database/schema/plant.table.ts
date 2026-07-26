@@ -7,8 +7,8 @@ import {
   jsonb,
 } from 'drizzle-orm/pg-core';
 import { uuidv7 } from 'uuidv7';
-import { pgTable } from './table';
-import { users } from './user.schema';
+import { pgTable } from './pg-table';
+import { users } from './user.table';
 import { plantCategories } from '../../features/plant/domain/plant-category';
 import type { PlantImage } from '../../features/plant/domain/plant-image';
 

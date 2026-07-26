@@ -1,6 +1,6 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
-import { UserSummarySchema } from './user-summary.schema';
+import { UserSummarySchema } from '../../../user/presentation/shared/user-summary.schema';
 
 const CommentIdParamSchema = z.object({
   id: z.uuid().meta({ description: '댓글 id (루트 또는 답글)' }),

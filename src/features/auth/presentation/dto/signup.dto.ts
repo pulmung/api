@@ -4,8 +4,8 @@ import {
   NICKNAME_MAX_LENGTH,
   NICKNAME_MIN_LENGTH,
 } from '../../../user/domain/user';
-import { SocialProviderSchema } from '../../../user/presentation/dto/social-provider.schema';
-import { deviceFields } from './device.fields';
+import { SocialProviderSchema } from '../../../user/presentation/shared/social-provider.schema';
+import { deviceFields } from '../shared/device.fields';
 
 const SignupSchema = z.object({
   provider: SocialProviderSchema,

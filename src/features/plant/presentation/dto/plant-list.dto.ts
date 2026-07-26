@@ -1,7 +1,7 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
-import { PlantCategorySchema } from './plant-category.schema';
-import { PlantImageSchema } from './plant-image.schema';
+import { PlantCategorySchema } from '../shared/plant-category.schema';
+import { PlantImageSchema } from '../shared/plant-image.schema';
 
 const PlantListQuerySchema = z.object({
   // keyset 커서 = 이전 페이지 마지막 식물 id (Stripe식 plain id — 정렬이 id DESC 하나뿐이라

@@ -61,8 +61,9 @@ npm run openapi:check    # 생성 + git diff로 드리프트 검출 (CI용)
 ```
 src/database/
   schema/
-    user.schema.ts        # 도메인별 테이블 정의
-    index.ts              # barrel: 모든 스키마 re-export (drizzle()에 전달)
+    pg-table.ts           # 전역 테이블 팩토리 (snake_case 변환 단일 소스)
+    user.table.ts         # 도메인별 테이블 정의
+    index.ts              # barrel = drizzle의 "schema" (drizzle()·drizzle-kit에 전달)
   seed/                   # reference data 시드 (데이터 = 코드, PR로 큐레이션)
     plant-dictionary.data.ts   # 속/종 사전 스타터 데이터
     plant-dictionary.seed.ts   # apply 함수 (insert-only 멱등, 자기 트랜잭션)
@@ -100,18 +101,21 @@ src/features/<feature>/
 
 ## 데이터베이스 / Drizzle 컨벤션
 
-### 스키마 파일
+### 테이블 정의 파일
 
-- **도메인별로 분리**한다(`user.schema.ts`, `post.schema.ts` …) + `index.ts` barrel에서 모아 re-export.
+- **도메인별로 분리**한다(`user.table.ts`, `post.table.ts` …) + `index.ts` barrel에서 모아 re-export.
   - 런타임 `drizzle(pool, { schema })`와 drizzle-kit `schema` 양쪽 모두 barrel을 가리킨다.
-- **테이블명 = 복수형**(`users`), **파일명 = 단수형**(`user.schema.ts`).
+- **접미사는 `.schema.ts`가 아니라 `.table.ts`다.** 이유 둘:
+  - **정확성** — drizzle에서 "schema"는 `drizzle(pool, { schema })`에 넘기는 **배럴 객체 전체**(= `index.ts`)를 가리킨다. 개별 파일이 정의하는 건 테이블이다.
+  - **충돌 회피** — presentation 레이어의 zod 조각도 `.schema.ts`를 쓴다([architecture.md](docs/architecture.md) §9). 실제로 `watering.schema.ts`가 DB와 presentation 양쪽에 동시에 존재한 적이 있다(Cmd+P 중복). 테이블 이름과 DTO 조각 이름은 둘 다 리소스명을 따라가므로 접미사가 같으면 계속 부딪힌다.
+- **테이블명 = 복수형**(`users`), **파일명 = 단수형**(`user.table.ts`).
   - Postgres 예약어 회피(`user`는 예약어) + 프레임워크 관례.
 
 ### 네이밍 (casing)
 
 - **코드: camelCase**(`createdAt`) / **DB 컬럼: snake_case**(`created_at`).
-- 변환은 **테이블 팩토리(`src/database/schema/table.ts`)** 에 위임한다 → 스키마에서 컬럼명 문자열을 생략한다.
-  - `pgTable = pgTableCreator((name) => name, 'snake_case')`. 모든 스키마 파일은 `drizzle-orm/pg-core`가 아니라 **이 `pgTable`** 을 import 한다.
+- 변환은 **테이블 팩토리(`src/database/schema/pg-table.ts`)** 에 위임한다 → 테이블 정의에서 컬럼명 문자열을 생략한다.
+  - `pgTable = pgTableCreator((name) => name, 'snake_case')`. 모든 `*.table.ts`는 `drizzle-orm/pg-core`가 아니라 **이 `pgTable`** 을 import 한다.
 - ⚠️ **drizzle v1.0부터 글로벌 `casing` 옵션이 제거**됐다. 더 이상 `drizzle(pool, { casing })`나 drizzle.config.ts의 `casing: 'snake_case'`로 주지 않는다 — casing은 **스키마(테이블 팩토리)에 단일 소스**로 박는다. (drizzle-kit의 `casing`은 이제 `'camel'|'preserve'`로 pull 방향 전용이다.)
 
 ### 컬럼 타입 규칙

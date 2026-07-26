@@ -1,6 +1,6 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
-import { UserSummarySchema } from './user-summary.schema';
+import { UserSummarySchema } from '../../../user/presentation/shared/user-summary.schema';
 
 // 루트·답글 목록이 공유하는 페이지 쿼리 — 커서 의미(댓글 id keyset)가 동일하다.
 const CommentPageQuerySchema = z.object({

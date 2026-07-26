@@ -1,6 +1,6 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
-import { WateringSchema } from './watering.schema';
+import { WateringSchema } from './watering.dto';
 
 const WateringListQuerySchema = z.object({
   // keyset 커서 = 이전 페이지 마지막 wateredOn — UNIQUE(개체, 날짜) 덕에 개체 내

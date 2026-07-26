@@ -22,7 +22,7 @@ import { WateringReader } from '../repository/watering.reader';
 import { UserPlantNotFoundError } from '../domain/user-plant.error';
 import { WateringNotFoundError } from '../domain/watering.error';
 import { RecordWateringDto } from './dto/record-watering.dto';
-import { WateringDto } from './dto/watering.schema';
+import { WateringDto } from './dto/watering.dto';
 import { WateringIdParamDto } from './dto/delete-watering.dto';
 import { UserPlantIdParamDto } from './dto/user-plant-detail.dto';
 import { WateringListDto, WateringListQueryDto } from './dto/watering-list.dto';

@@ -1,6 +1,6 @@
 import { timestamp, uuid, text, unique } from 'drizzle-orm/pg-core';
 import { uuidv7 } from 'uuidv7';
-import { pgTable } from './table';
+import { pgTable } from './pg-table';
 import { socialProviders } from '../../features/user/domain/social-provider';
 
 export const UNIQUE_USERS_NICKNAME = 'uq_users_nickname';

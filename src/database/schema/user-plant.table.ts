@@ -8,9 +8,9 @@ import {
   integer,
 } from 'drizzle-orm/pg-core';
 import { uuidv7 } from 'uuidv7';
-import { pgTable } from './table';
-import { users } from './user.schema';
-import { plants } from './plant.schema';
+import { pgTable } from './pg-table';
+import { users } from './user.table';
+import { plants } from './plant.table';
 import type { PlantImage } from '../../features/plant/domain/plant-image';
 
 export const FK_USER_PLANTS_PLANT = 'fk_user_plants_plant';

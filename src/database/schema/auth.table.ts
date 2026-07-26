@@ -1,7 +1,7 @@
 import { uuid, text, timestamp } from 'drizzle-orm/pg-core';
-import { pgTable } from './table';
+import { pgTable } from './pg-table';
 import { uuidv7 } from 'uuidv7';
-import { users } from './user.schema';
+import { users } from './user.table';
 import { clientPlatforms } from '../../features/auth/domain/client-platform';
 
 export const sessions = pgTable('sessions', {

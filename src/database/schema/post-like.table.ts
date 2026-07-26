@@ -1,7 +1,7 @@
 import { index, primaryKey, timestamp, uuid } from 'drizzle-orm/pg-core';
-import { pgTable } from './table';
-import { users } from './user.schema';
-import { posts } from './post.schema';
+import { pgTable } from './pg-table';
+import { users } from './user.table';
+import { posts } from './post.table';
 
 // 라우트 대상(postId)이 그 사이 삭제된 경우 INSERT가 23503 — 사전 SELECT 대신
 // 이 이름으로 잡아 404로 변환한다(FK_COMMENTS_POST와 같은 경로).

@@ -1,7 +1,7 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
-import { SocialProviderSchema } from '../../../user/presentation/dto/social-provider.schema';
-import { deviceFields } from './device.fields';
+import { SocialProviderSchema } from '../../../user/presentation/shared/social-provider.schema';
+import { deviceFields } from '../shared/device.fields';
 
 const LoginSchema = z.object({
   provider: SocialProviderSchema,

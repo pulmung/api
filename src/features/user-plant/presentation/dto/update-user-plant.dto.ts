@@ -6,7 +6,7 @@ import {
   WATERING_INTERVAL_MAX_DAYS,
   WATERING_INTERVAL_MIN_DAYS,
 } from '../../domain/user-plant';
-import { UserPlantImageInputSchema } from './user-plant-image-input.schema';
+import { UserPlantImageInputSchema } from '../shared/user-plant-image-input.schema';
 
 // JSON Merge Patch(RFC 7396): 필드 부재 = 미변경, null = 해제, 값 = 교체.
 // 전 필드 optional은 "만능 DTO"(§9 금지)가 아니라 merge-patch의 정직한 계약이다 —

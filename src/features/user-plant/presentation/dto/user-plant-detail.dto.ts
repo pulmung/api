@@ -1,6 +1,6 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
-import { PlantImageSchema } from '../../../plant/presentation/dto/plant-image.schema';
+import { PlantImageSchema } from '../../../plant/presentation/shared/plant-image.schema';
 
 const UserPlantIdParamSchema = z.object({
   id: z.uuid().meta({ description: '내 식물(개체) id' }),

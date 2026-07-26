@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { UserSummarySchema } from '../../../user/presentation/shared/user-summary.schema';
 
 // 목록 아이템 = 상세의 부분집합(상세 = 목록 + content·updatedAt) — 의도된 공유
 // (변경 이유 동일: "글을 어떻게 요약 표현하나"). 상세 DTO가 .extend로 파생해
@@ -15,10 +16,7 @@ export const PostListItemSchema = z.object({
     description: '첫 이미지 읽기 URL — 이미지 없는 글이면 null',
     example: 'https://cdn.pulmung.com/post-image/018f2e6a.jpg',
   }),
-  author: z.object({
-    id: z.uuid(),
-    nickname: z.string().meta({ example: '식집사' }),
-  }),
+  author: UserSummarySchema,
   plant: z
     .object({
       id: z.uuid(),

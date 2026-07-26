@@ -1,6 +1,6 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
-import { commentContentField } from './comment-content.field';
+import { commentContentField } from '../shared/comment-content.field';
 
 const CreateReplySchema = z.object({
   content: commentContentField,

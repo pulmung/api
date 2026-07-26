@@ -1,7 +1,7 @@
 import { uuid, date, timestamp, unique } from 'drizzle-orm/pg-core';
 import { uuidv7 } from 'uuidv7';
-import { pgTable } from './table';
-import { userPlants } from './user-plant.schema';
+import { pgTable } from './pg-table';
+import { userPlants } from './user-plant.table';
 
 // 문장 실행 중 부모 개체가 동시 삭제되면(23503) 도메인 예외로 변환하기 위한 명시적 FK 이름
 // (user_plants의 FK_USER_PLANTS_PLANT와 같은 결 — §7 원칙의 FK 버전, 상수로 단일 소스).

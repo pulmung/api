@@ -1,6 +1,6 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
-import { UserSummarySchema } from './user-summary.schema';
+import { UserSummarySchema } from '../../../user/presentation/shared/user-summary.schema';
 
 // 답글 아이템 — 답글은 soft delete가 없어(자식이 없다 — 삭제 삼분기) union 불요.
 // parentId는 URL(:id)이 이미 말하므로 제외. 페이지 쿼리는 CommentPageQueryDto 공유.

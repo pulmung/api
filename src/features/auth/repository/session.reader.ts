@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { TransactionHost } from '@nestjs-cls/transactional';
 import type { DrizzleDB } from '../../../database/drizzle.constants';
 import type { DrizzleTransactionalAdapter } from '../../../database/drizzle-transactional.adapter';
-import { sessions } from '../../../database/schema/auth.schema';
+import { sessions } from '../../../database/schema';
 import { eq } from 'drizzle-orm';
 
 @Injectable()

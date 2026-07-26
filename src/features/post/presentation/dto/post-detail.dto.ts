@@ -1,6 +1,6 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
-import { PostListItemSchema } from './post-list-item.schema';
+import { PostListItemSchema } from '../shared/post-list-item.schema';
 
 const PostIdParamSchema = z.object({
   id: z.uuid().meta({ description: '게시글 id' }),

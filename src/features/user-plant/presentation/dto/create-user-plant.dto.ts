@@ -6,7 +6,7 @@ import {
   WATERING_INTERVAL_MAX_DAYS,
   WATERING_INTERVAL_MIN_DAYS,
 } from '../../domain/user-plant';
-import { UserPlantImageInputSchema } from './user-plant-image-input.schema';
+import { UserPlantImageInputSchema } from '../shared/user-plant-image-input.schema';
 
 const CreateUserPlantSchema = z.object({
   name: z

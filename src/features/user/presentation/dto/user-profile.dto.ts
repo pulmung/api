@@ -1,6 +1,6 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
-import { SocialProviderSchema } from './social-provider.schema';
+import { SocialProviderSchema } from '../shared/social-provider.schema';
 
 // GET /users/me와 PATCH /users/me 200이 공유하는 조회 표현 — 같은 리소스, 변경 이유 동일(§9).
 const UserProfileSchema = z.object({

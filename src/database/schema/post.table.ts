@@ -7,9 +7,9 @@ import {
   jsonb,
 } from 'drizzle-orm/pg-core';
 import { uuidv7 } from 'uuidv7';
-import { pgTable } from './table';
-import { users } from './user.schema';
-import { plants } from './plant.schema';
+import { pgTable } from './pg-table';
+import { users } from './user.table';
+import { plants } from './plant.table';
 
 // 무상태 access token은 계정 삭제를 즉시 모른다(폐기는 refresh 경계 책임 — architecture §10).
 // 삭제된 유저의 아직 유효한 토큰으로 INSERT가 오면 23503 — 사전 SELECT 대신 이 이름으로

@@ -1,6 +1,6 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
-import { PlantImageSchema } from '../../../plant/presentation/dto/plant-image.schema';
+import { PlantImageSchema } from '../../../plant/presentation/shared/plant-image.schema';
 
 const UserPlantListQuerySchema = z.object({
   // keyset 커서 = 이전 페이지 마지막 개체 id (plant 카탈로그와 동일 패턴 — 정렬이
