@@ -1,6 +1,15 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Header,
+  Param,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { ZodResponse } from 'nestjs-zod';
 import { Authenticated } from '../../auth/presentation/authenticated.decorator';
+import { OptionalAuth } from '../../auth/presentation/optional-auth.decorator';
 import { CurrentUser } from '../../../common/auth/current-user.decorator';
 import type { AuthUser } from '../../../common/auth/auth-user';
 import { ApiErrors } from '../../../common/swagger/api-errors.decorator';
@@ -49,24 +58,33 @@ export class PostCommentController {
     return comment;
   }
 
-  // 공개 라우트 = 무표시(데코 0) — 글이 공개면 스레드도 공개다.
+  // 글이 공개면 스레드도 공개다 — 다만 응답이 뷰어별 차단 필터를 받으므로 무표시(공개)가
+  // 아니라 @OptionalAuth다. 토큰 없으면 익명 통과(필터 없음), 있으면 검증(잘못됐으면 401).
+  // ⚠️ 이 라우트는 원래 공개(데코 0)였다 — 차단 도입으로 계약이 바뀌었다(스펙의 security).
   @Get()
+  @OptionalAuth()
+  // 뷰어별 응답이라 공유 캐시 금지 — 없으면 A에게 숨겨진 댓글이 B의 응답으로 재사용된다.
+  @Header('Cache-Control', 'private, no-store')
+  @Header('Vary', 'Authorization')
   @ApiErrors(PostNotFoundError)
   @ZodResponse({
     status: 200,
     description:
       '루트 댓글 목록 — 등록순(id ASC) keyset 페이지네이션. 삭제된 댓글은 답글이 남은 ' +
-      '경우에만 deleted: true 플레이스홀더로 나온다. 답글은 replyCount만 주고 지연 로드',
+      '경우에만 deleted: true 플레이스홀더로 나온다. 답글은 replyCount만 주고 지연 로드. ' +
+      '인증 시 서로 차단한 관계의 댓글이 목록·replyCount에서 제외된다(비로그인이면 전체 노출)',
     type: CommentListDto,
   })
   async list(
     @Param() params: CommentPostIdParamDto,
     @Query() query: CommentPageQueryDto,
+    @CurrentUser() user: AuthUser | undefined,
   ): Promise<CommentListDto> {
     const page = await this.commentQuery.findRootPage({
       postId: params.postId,
       cursor: query.cursor,
       limit: query.limit,
+      viewerId: user?.id,
     });
     // 페이지 쿼리의 0행은 "댓글 없는 글"과 "비존재 글"이 겹친다 — 그때만 존재 확인
     // (watering 전례).

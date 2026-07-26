@@ -6,3 +6,5 @@ export * from './watering.table';
 export * from './post.table';
 export * from './comment.table';
 export * from './post-like.table';
+export * from './user-block.table';
+export * from './report.table';

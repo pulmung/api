@@ -4,6 +4,7 @@ import { TransactionHost } from '@nestjs-cls/transactional';
 import type { DrizzleDB } from '../../../database/drizzle.constants';
 import type { DrizzleTransactionalAdapter } from '../../../database/drizzle-transactional.adapter';
 import { plants, postLikes, posts, users } from '../../../database/schema';
+import { excludeBlocked } from '../../moderation/repository/block-filter';
 
 // 게시글 read model의 원천 행 — 부분 select(옵트인). content는 상세 전용이라 목록 제외
 // (본문 50k까지 가능 — 목록에 실으면 페이로드가 터진다). authorId 원시 컬럼 대신
@@ -58,11 +59,14 @@ export class PostReader {
   // keyset 페이지네이션(uuidv7 id DESC = 최신순) — 전역 목록은 PK btree가,
   // authorId/plantId 필터는 (fk, id) 복합 인덱스가 정렬까지 커버한다.
   // ⚠️ hasMore 판별용으로 limit+1개까지 반환한다(n+1) — 자르기·nextCursor는 호출자 몫.
+  // 차단 필터가 WHERE에 있으므로 이 limit+1은 **필터 통과 행 기준**이다 — 앱에서 후처리로
+  // 걸러내면 페이지가 들쭉날쭉해지지만(20 요청 → 17개) SQL이면 DB가 채워서 준다.
   async findPageRows(params: {
     cursor?: string;
     limit: number;
     plantId?: string;
     authorId?: string;
+    viewerId?: string;
   }) {
     return this.db
       .select(POST_LIST_ROW)
@@ -74,6 +78,10 @@ export class PostReader {
           params.authorId ? eq(posts.authorId, params.authorId) : undefined,
           params.plantId ? eq(posts.plantId, params.plantId) : undefined,
           params.cursor ? lt(posts.id, params.cursor) : undefined,
+          // 서로 차단한 관계의 글 제외(양방향). 익명 뷰어면 undefined라 조건이 빠진다.
+          // ⚠️ 상세(findById)에는 붙이지 않는다 — 차단은 목록 필터일 뿐이라는 결정
+          // (user-block.table.ts doc "효과 범위").
+          excludeBlocked(this.db, params.viewerId, posts.authorId),
         ),
       )
       .orderBy(desc(posts.id))

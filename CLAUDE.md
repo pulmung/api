@@ -120,6 +120,7 @@ src/features/<feature>/
 
 - 의존 방향: `presentation → application → domain ← infra`. 모듈 간 횡단은 **"사용 → 소유"** 한 방향 (예: `auth → user`).
 - **트랜잭션 경계는 유스케이스가 소유한다** — 유스케이스 메서드에 `@Transactional()`, 어댑터는 `db.transaction()`을 열지 않고 `TransactionHost`로 핸들을 받는다. ⚠️ 새 DB 어댑터를 만들 때 `@Inject(DRIZZLE)`을 쓰면 트랜잭션을 조용히 벗어난다 (상세·함정은 [@docs/architecture.md](docs/architecture.md) §7-1).
+- **뷰어별 가시성 필터는 SQL `WHERE`에 넣고 재사용 조각 하나로 쓴다** — 차단은 `excludeBlocked()`(`features/moderation/repository/block-filter.ts`). ⚠️ 새 목록 읽기 경로(피드·검색·알림…)를 만들 때 빠뜨리면 **조용히 fail-open**이다 — 인증 데코 누락과 달리 아무것도 터지지 않고 정상 응답으로 보인다. 앱 후처리로 걸러내면 페이지 크기가 깨진다(상세·E2E 규율은 [@docs/architecture.md](docs/architecture.md) §2-1).
 - 엔티티는 "가장 오래 책임지는 컨텍스트"가 소유한다 (예: `User` = user). 경계를 넘겨 쓰려면 `exports`로 공개.
 
 ---

@@ -64,10 +64,12 @@ export type ReplyPage = {
 export class CommentQueryService {
   constructor(private readonly reader: CommentReader) {}
 
+  // viewerId 없음 = 익명 뷰어(공개 열람) → 차단 필터가 적용되지 않는다(차단은 뷰어별 개념).
   async findRootPage(params: {
     postId: string;
     cursor?: string;
     limit: number;
+    viewerId?: string;
   }): Promise<RootCommentPage> {
     // reader는 hasMore 판별용 limit+1행까지 준다(n+1) — 끝 감지에 COUNT 불필요.
     const rows = await this.reader.findRootPageRows(params);
@@ -75,7 +77,12 @@ export class CommentQueryService {
     const page = hasMore ? rows.slice(0, params.limit) : rows;
 
     // 페이지의 루트 id들로 답글 수 1쿼리 집계 — 페이지 조립은 reader가 아니라 여기.
-    const replyCounts = await this.reader.replyCounts(page.map((r) => r.id));
+    // ⚠️ viewerId를 함께 넘긴다 — 목록과 카운트가 같은 차단 조건을 봐야 "답글 N개"가
+    // 실제로 열리는 답글 수와 일치한다.
+    const replyCounts = await this.reader.replyCounts(
+      page.map((r) => r.id),
+      params.viewerId,
+    );
 
     return {
       comments: page.map((row) =>
@@ -89,6 +96,7 @@ export class CommentQueryService {
     parentId: string;
     cursor?: string;
     limit: number;
+    viewerId?: string;
   }): Promise<ReplyPage> {
     const rows = await this.reader.findReplyPageRows(params);
     const hasMore = rows.length > params.limit;

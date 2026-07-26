@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Header,
   HttpCode,
   HttpStatus,
   Param,
@@ -13,6 +14,7 @@ import {
 import { ApiNoContentResponse } from '@nestjs/swagger';
 import { ZodResponse } from 'nestjs-zod';
 import { Authenticated } from '../../auth/presentation/authenticated.decorator';
+import { OptionalAuth } from '../../auth/presentation/optional-auth.decorator';
 import { CurrentUser } from '../../../common/auth/current-user.decorator';
 import type { AuthUser } from '../../../common/auth/auth-user';
 import { ApiErrors } from '../../../common/swagger/api-errors.decorator';
@@ -81,24 +83,30 @@ export class CommentController {
     return comment;
   }
 
-  // 공개 라우트 = 무표시 — 루트 목록과 동일.
+  // 루트 목록과 동일하게 @OptionalAuth — 뷰어별 차단 필터가 걸리므로 공개(무표시)가 아니다.
   @Get(':id/replies')
+  @OptionalAuth()
+  @Header('Cache-Control', 'private, no-store')
+  @Header('Vary', 'Authorization')
   @ApiErrors(CommentNotFoundError)
   @ZodResponse({
     status: 200,
     description:
       '답글 목록 — 등록순(id ASC) keyset 페이지네이션. :id는 루트 댓글만(답글이면 404). ' +
-      '삭제된(deleted: true) 루트의 답글도 열람 가능 — 플레이스홀더가 스레드를 보존한다',
+      '삭제된(deleted: true) 루트의 답글도 열람 가능 — 플레이스홀더가 스레드를 보존한다. ' +
+      '인증 시 서로 차단한 관계의 답글은 제외된다(비로그인이면 전체 노출)',
     type: ReplyListDto,
   })
   async list(
     @Param() params: CommentIdParamDto,
     @Query() query: CommentPageQueryDto,
+    @CurrentUser() user: AuthUser | undefined,
   ): Promise<ReplyListDto> {
     const page = await this.commentQuery.findReplyPage({
       parentId: params.id,
       cursor: query.cursor,
       limit: query.limit,
+      viewerId: user?.id,
     });
     // 0행은 "답글 없는 루트"와 "비존재·답글 id"가 겹친다 — 그때만 존재 확인.
     // (답글이 하나라도 나왔다면 부모는 루트임이 구조로 증명된다.)

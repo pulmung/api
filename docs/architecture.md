@@ -47,6 +47,20 @@ presentation → application → domain ← (repository | infrastructure)
   - **조합 있음** (여러 어댑터 조합·표현 변환): controller → **application 쿼리 서비스** → reader. 참조 구현: `features/plant` 카탈로그 조회(`GET /plants`·`GET /plants/:id`) — `PlantQueryService`가 reader 행 + `PublicFileUrlResolver`(파일 URL)를 read model로 조합. CQRS의 쿼리 핸들러 자리이며, 조합 없는 읽기에 이 레이어를 두면 pass-through 의례다(§0).
 - UseCase **1개 = 1 클래스 + `execute`** (동작마다 의존이 다를 때). 의존이 거의 같으면 한 서비스로 묶어도 됨 — 기준은 **의존 응집도**이지 규칙이 아니다.
 
+### 2-1. 뷰어별 가시성 필터 — SQL에 넣고, 조각 하나로 단일화한다
+
+> **한 줄 요약: "이 뷰어에게 보이면 안 되는 행"을 걸러내는 조건은 앱 후처리가 아니라 쿼리의 `WHERE`에 넣고, 그 조건을 재사용 조각 **한 곳**에 두고 라우트별 E2E로 묶는다. 누락이 조용한 fail-open이기 때문이다.**
+
+참조 구현: 차단 필터 `features/moderation/repository/block-filter.ts`의 `excludeBlocked()` (적용 지점: `post.reader.findPageRows` · `comment.reader.findRootPageRows`·`findReplyPageRows`·`replyCounts`).
+
+- **왜 SQL인가**: 앱에서 가져온 뒤 걸러내면 **페이지 크기가 깨진다** — `limit 20`을 받아 3개를 버리면 17개가 나가고, 그걸 메우려 오버페치 루프를 도는 코드가 생긴다. `WHERE`에 있으면 DB가 필터 통과 행으로 `limit+1`을 채워서 준다(기존 keyset 규약 그대로). 클라 필터링은 더 나쁘다 — 숨겨야 할 닉네임·본문이 응답 JSON에 실려 나가므로 "표시하지 않기"는 격리가 아니다. 멀티 클라이언트(web·mobile)라 한쪽만 빠뜨려도 구멍이 된다.
+  - 페이지네이션 계약도 이 결정을 전제로 읽어야 한다: `limit`은 **상한**이고, 끝의 신호는 결과 개수가 아니라 `nextCursor === null`이다(성숙한 API들의 공통 태도). 클라가 개수를 세서 끝을 판단하면 그게 버그다.
+- **왜 조각 하나인가**: 적용 지점이 목록마다 늘어나는데(피드·검색·알림이 붙을 예정) **조건을 빠뜨려도 아무 신호가 없다**. §10이 인증 opt-in에서 인정한 fail-open과 같은 부류지만 **더 나쁘다** — 인증 데코 누락은 `@CurrentUser()`가 `undefined`라 대개 TypeError로 터지지만, 가시성 조건 누락은 정상 응답으로 보인다.
+- **그래서 E2E가 필수다**(`test/block-filter.e2e-spec.ts`). 이 테스트가 없으면 필터가 죽어도 모든 테스트가 통과한다 — `test/transactional.e2e-spec.ts`가 CLS 배선에 대해 갖는 역할과 같다(§7-1의 "침묵하는 실패"). 특히 **양방향**을 검증한다: 절반만 도는 구현은 눈으로는 통과처럼 보인다.
+- **뷰어가 없으면 조건을 붙이지 않는다** — 조각이 `viewerId`가 없을 때 `undefined`를 반환해 `and(...)`가 건너뛰게 한다(기존 `cursor ? gt(...) : undefined` 관례와 같은 모양). 가시성은 뷰어별 개념이라 익명에겐 존재하지 않는다.
+- **필터가 붙는 라우트는 `@OptionalAuth()` + `Cache-Control: private, no-store` + `Vary: Authorization`이 함께 간다**(§10). 응답이 뷰어마다 갈리므로 공유 캐시가 A의 응답을 B에게 주면 필터가 무의미해진다. ⚠️ 이 때문에 **원래 공개(무표시)였던 라우트가 계약을 바꾼다** — 댓글 목록 2개가 실제로 그렇게 전환됐다(스펙의 `security`가 바뀌어 web codegen에 전파).
+- **비정규화 카운터는 이 필터를 못 받는다** — 전역 값이라 뷰어별로 계산할 수 없다(`posts.commentCount`). 반면 실시간 집계는 같은 조건을 받아야 한다(`replyCount`). 이 비대칭은 결함이 아니라 판정 결과다: **불일치가 같은 화면 안에서 드러나는가**를 기준으로 갈랐다("답글 N개"를 눌러 다른 수가 나오면 즉시 보이지만, 목록↔상세 간 카운터 차이는 덜 드러난다).
+
 ---
 
 ## 3. 모듈 / 폴더 (feature-first)
@@ -172,7 +186,7 @@ features/<feature>/
 - **무상태 검증**: 서명 + 만료 + **알고리즘 고정(`algorithms: ['HS256']`)** 만 확인하고 `sub`를 신뢰 → `req.user = { id }`. 매 요청 DB 조회 없음(폐기/밴은 refresh 경계의 DB 세션이 책임 — access는 짧게 산다). 실패는 형태 불문 **단일 `UnauthenticatedError`(401)** 로 통일(만료/위조 구분 안 함 = oracle 회피). `sub`가 문자열이 아니면 거부.
 - **가드는 opt-in — 전역 `APP_GUARD`가 아니다**(§13). 라우트에 데코레이터로 붙인다(`features/auth/presentation/`):
   - `@Authenticated()` = `UseGuards(JwtAuthGuard)` + `@ApiBearerAuth()` + `@ApiErrors(UnauthenticatedError)` 합성 → **가드(enforcement) + OpenAPI 문서**를 한 데코로. 보호 라우트에.
-  - `@OptionalAuth()` = `UseGuards(JwtAuthGuard)` + `SetMetadata(IS_OPTIONAL_AUTH_KEY)` + `@ApiErrors(UnauthenticatedError)` + **`@ApiOperation({ security: [{}, { bearer: [] }] })`** → 토큰 없으면 익명 통과, 있으면 검증(잘못됐으면 401). 참조 구현: `GET /posts`·`GET /posts/:id`(뷰어별 `isLiked`).
+  - `@OptionalAuth()` = `UseGuards(JwtAuthGuard)` + `SetMetadata(IS_OPTIONAL_AUTH_KEY)` + `@ApiErrors(UnauthenticatedError)` + **`@ApiOperation({ security: [{}, { bearer: [] }] })`** → 토큰 없으면 익명 통과, 있으면 검증(잘못됐으면 401). 참조 구현: `GET /posts`·`GET /posts/:id`(뷰어별 `isLiked`) / `GET /posts/:postId/comments`·`GET /comments/:id/replies`(뷰어별 차단 필터 — 원래 공개였다가 §2-1 도입으로 전환된 사례).
     - ⚠️ 여기서만 `@ApiBearerAuth()`를 쓰지 않는다 — 그건 `security: [{ bearer: [] }]`(= **인증 필수**)를 내보내 공개 라우트를 거짓말하게 만들고, codegen이 토큰을 필수 인자로 뽑는다. 빈 요구사항 `{}`를 **먼저** 둔 배열이 "무인증도 허용"의 OpenAPI 표기다(§9 계약 정확성).
     - ⚠️ 가드는 **헤더가 아예 없을 때만** 익명 통과시킨다. 헤더를 보냈는데 만료·손상이면 401이다(만료를 익명으로 조용히 강등하지 않는다) → 클라의 토큰 갱신 인터셉터가 이 "공개" 라우트도 커버해야 한다.
     - ⚠️ 응답이 뷰어별로 갈리므로 해당 라우트엔 `Cache-Control: private, no-store` + `Vary: Authorization`이 함께 간다 — 없으면 공유 캐시가 A의 응답을 B에게 준다.
