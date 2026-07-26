@@ -1,6 +1,6 @@
-# TODO — 관측·알림 (미룸: 필요해질 때 additive)
+# TODO — 미룬 작업 (필요해질 때 additive)
 
-> 구조화 로깅까지는 됨([logging.md](logging.md)). 아래는 **트래픽 · 첫 배포 · 팀**이 실제로 요구할 때 붙인다. 씨앗(단일 에러 길목 · 구조화 JSON · reqId · stdout)이 이미 심겨 있어 각 항목은 대체로 "그날 30분"짜리 additive 작업이다.
+> 관측·알림은 구조화 로깅까지 됨([logging.md](logging.md)). 아래는 **트래픽 · 첫 배포 · 팀 · PR 워크플로**가 실제로 요구할 때 붙인다. 씨앗(단일 에러 길목 · 구조화 JSON · reqId · stdout)이 이미 심겨 있어 각 항목은 대체로 "그날 30분"짜리 additive 작업이다.
 
 > 원칙: **캡처는 넓게, 알림은 집계 신호에 좁게.** 라인 단위 알림 ❌(폭주).
 
@@ -30,6 +30,13 @@
   - **미리 지켜야 할 3가지(코드 아님, 규율)**: (a) key prefix 규칙 `{purpose}/…` 유지 — GC가 이걸로 객체↔테이블 매핑. (b) 이미지 key를 저장하는 **새 소비처 테이블**(chat 등)이 생기면 참조 스캔 대상에 추가(현재: `user_plants`·`plants`·`posts.image_keys` — posts는 본문 HTML이 아니라 쓰기 시점 파생 컬럼 `image_keys`를 스캔한다, HTML 파싱 불필요). (c) 30일 grace가 "업로드→submit 최대 시간"보다 훨씬 길다는 가정 위에 race-free(현 presign 만료 5분이라 여유 충분).
   - **만들 때 형태**: in-process `@Interval` 금지(인스턴스마다 발화·API 가동에 수명 종속) → 독립 엔트리포인트(`seed/run.ts` 결) + 외부 스케줄러(EventBridge → ECS task/Lambda). 스케일 나면 live `ListObjectsV2` 대신 **S3 Inventory** 매니페스트. IAM에 `s3:DeleteObject` 추가([file-upload.md](file-upload.md) §7).
   - **연계 seam — 계정 삭제**: `user_plants.ownerId`가 `onDelete: cascade`라 계정 삭제는 DB 레벨로 행을 지운다. 그 이미지들도 참조가 끊기므로 결국 이 sweep이 청소한다(별도 enqueue 불필요) — 단 "즉시 파기"가 법적으로 요구되면 그땐 계정 삭제 usecase가 직접 S3 삭제를 호출해야 한다.
+
+## 개발 인프라
+
+- [ ] **CI 파이프라인** (GitHub Actions: `lint` · `vitest run` · `openapi:check`) — ⛔ **반복 기각됨. 먼저 제안하지 말 것.**
+  - **왜 지금 안 하나**: CI의 값은 대부분 **머지 게이트**에서 나온다. 현재는 1인 개발 + main 직접 커밋(PR 없음) + 배포 없음 → **게이트할 지점 자체가 없다.** 남는 건 "push 후 빨간불 알림"인데 로컬 `npm test`와 차이가 없다. "`openapi:check`를 만들어놓고 안 돌린다"는 근거도 검증해보니 약했다 — 2026-07-26 실행 시 exit 0(드리프트 0)으로, CI가 막을 사고가 실제로 발생하고 있지 않다.
+  - **재검토 트리거** (넷 중 하나가 *실제로* 발생할 때 — "언젠가 필요하니까"는 트리거가 아니다): ① PR 워크플로 시작 ② 배포 생김 ③ 협업자 합류 ④ 로컬 테스트 누락이 실제로 발생.
+  - **만들 때 형태**: ubuntu 러너면 Docker가 내장이라 E2E의 testcontainers가 그대로 돈다. `openapi:check`는 이미 CI용으로 존재하니 스텝 나열만 하면 되는 "그날 30분"짜리다 — 미뤄도 나중 비용이 늘지 않는다.
 
 ## 상시
 
