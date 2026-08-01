@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { FileModule } from '../file/file.module';
+import { ModerationModule } from '../moderation/moderation.module';
 import { PostModule } from '../post/post.module';
 import { DeleteUserUseCase } from './application/delete-user.usecase';
 import { UpdateUserUseCase } from './application/update-user.usecase';
@@ -19,7 +20,13 @@ import { UserReader } from './repository/user.reader';
   //
   // FileModule: 아바타의 첨부 시점 head() 실존 검증(S3FileStorage)과 읽기 URL 조합
   // (PublicFileUrlResolver). imports가 0인 모듈이라 순환 없음.
-  imports: [PostModule, FileModule],
+  //
+  // ModerationModule: 공개 프로필(GET /users/:userId)의 isBlocked. 차단 상태를 user가
+  // *사용*하고 moderation이 *소유*하므로 "사용 → 소유" 정방향이다(§3) — 반대로 moderation이
+  // user를 import하지 않아 순환이 없다(그쪽이 쓰는 userSummaryColumns는 순수 함수라 파일
+  // import로 끝난다). ⚠️ user가 차단을 *소유*하게 되면 그 순간 모양이 틀어진다 — "user가
+  // 콘텐츠 가시성을 소유"는 moderation.module doc이 명시적으로 기각한 배치다.
+  imports: [PostModule, FileModule, ModerationModule],
   controllers: [UserController],
   providers: [
     UpdateUserUseCase,

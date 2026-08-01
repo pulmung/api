@@ -19,10 +19,15 @@ import { ReportController } from './presentation/report.controller';
  * 콘텐츠 가시성을 소유"하는 모양이 된다. 앞으로 자동 숨김·제재·이의제기가 붙을 자리도
  * 여기다("사용 → 소유" §3에서 이 모듈이 소유 쪽).
  *
- * **exports가 없는 이유**: 이 모듈이 밖으로 내보내는 것은 DI 프로바이더가 아니라
- * `excludeBlocked()` — 순수 함수라 파일 import로 끝난다(§9가 zod 조각에 적용한 것과 같은
- * 결: DI가 아닌 계약 조각은 `exports`가 아니라 파일 경계로 공개한다). 소비처는
- * post/comment의 reader이고, 방향은 `post → moderation` 한 방향이다.
+ * **밖으로 나가는 것이 둘인데 경로가 다르다** — 판정은 "DI가 필요한가" 하나다:
+ * - `excludeBlocked()`(block-filter.ts)는 **순수 함수**라 `exports`가 아니라 파일 import로
+ *   끝난다(§9가 zod 조각에 적용한 것과 같은 결: DI가 아닌 계약 조각은 파일 경계로 공개한다).
+ *   소비처는 post/comment의 reader다.
+ * - `UserBlockReader`는 **DB 핸들을 주입받는 프로바이더**라 파일 import로는 못 준다 → `exports`.
+ *   소비처는 `UserQueryService`이며(공개 프로필의 `isBlocked`), 방향은 `user → moderation`
+ *   한 방향이다 — user가 차단 상태를 *사용*하고 이 모듈이 *소유*한다(§3).
+ *
+ * 어느 쪽이든 방향은 `소비처 → moderation`이고 순환은 없다.
  *
  * imports는 FileModule 하나뿐이다 — 차단 목록의 상대 아바타 읽기 URL을 조합하는
  * `PublicFileUrlResolver` 때문이고, FileModule은 imports가 0이라 순환이 없다. 신고 대상
@@ -42,5 +47,6 @@ import { ReportController } from './presentation/report.controller';
     ReportWriter,
     ReportTargetReader,
   ],
+  exports: [UserBlockReader],
 })
 export class ModerationModule {}

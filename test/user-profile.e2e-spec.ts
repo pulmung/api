@@ -249,4 +249,137 @@ describe('UserProfile (e2e)', () => {
       expect(status).toBe(400);
     });
   });
+
+  // 남의 프로필 — /users/me와 **다른 표현**이라는 것이 이 블록의 핵심 계약이다.
+  describe('GET /users/:userId', () => {
+    let otherToken: string;
+    let otherId: string;
+
+    const getUser = async (userId: string, token?: string) => {
+      let req = request(server).get(`/users/${userId}`);
+      if (token) req = req.set('Authorization', `Bearer ${token}`);
+      const res = await req;
+      return { status: res.status, body: res.body as Record<string, unknown> };
+    };
+
+    const setBlock = async (
+      userId: string,
+      token: string,
+      blocked: boolean,
+    ) => {
+      const path = `/users/${userId}/block`;
+      const req = blocked
+        ? request(server).put(path)
+        : request(server).delete(path);
+      await req.set('Authorization', `Bearer ${token}`);
+    };
+
+    beforeEach(async () => {
+      otherToken = await signup('user-profile-target', '옆집식집사');
+      const [row] = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.nickname, '옆집식집사'));
+      otherId = row.id;
+    });
+
+    it('200(익명): 공개 필드만 — provider·email이 응답에 없다', async () => {
+      const { status, body } = await getUser(otherId);
+      expect(status).toBe(200);
+      // toEqual = 정확 매칭이라 본인 전용 값이 새면 여기서 터진다.
+      expect(body).toEqual({
+        id: otherId,
+        nickname: '옆집식집사',
+        profileImageUrl: null,
+        createdAt: expect.stringMatching(
+          /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/,
+        ) as unknown,
+        // 익명 뷰어에겐 차단 개념이 없다.
+        isBlocked: false,
+      });
+    });
+
+    it('200: 아바타 설정 시 읽기 URL — 저장은 key, 응답은 URL', async () => {
+      await patchMe({ profileImageKey: AVATAR_KEY }, meToken);
+
+      const { status, body } = await getUser(meId, otherToken);
+      expect(status).toBe(200);
+      expect(body.profileImageUrl).toBe(AVATAR_URL);
+    });
+
+    it('200: 내 id로 호출해도 공개 표현이다 — 본인 전용 값은 /users/me가 소유', async () => {
+      const { status, body } = await getUser(meId, meToken);
+      expect(status).toBe(200);
+      expect(body.nickname).toBe('프로필유저');
+      expect(body).not.toHaveProperty('email');
+      expect(body).not.toHaveProperty('provider');
+      // 자기 차단은 불가능하므로 항상 false (쿼리 없이 판정된다).
+      expect(body.isBlocked).toBe(false);
+    });
+
+    it('200: isBlocked가 차단/해제를 따라간다 — 차단해도 프로필은 계속 200', async () => {
+      expect((await getUser(otherId, meToken)).body.isBlocked).toBe(false);
+
+      await setBlock(otherId, meToken, true);
+      const blocked = await getUser(otherId, meToken);
+      // 차단의 효과 범위는 "목록에서 숨김"이다 — 상세 접근은 그대로 200.
+      expect(blocked.status).toBe(200);
+      expect(blocked.body.isBlocked).toBe(true);
+
+      await setBlock(otherId, meToken, false);
+      expect((await getUser(otherId, meToken)).body.isBlocked).toBe(false);
+    });
+
+    it('200: 상대가 나를 차단해도 isBlocked는 false — 단방향(조용한 조치)', async () => {
+      await setBlock(meId, otherToken, true);
+
+      const { status, body } = await getUser(otherId, meToken);
+      expect(status).toBe(200);
+      // 여기서 true가 나오면 차단이 상대에게 드러난다 — 목록 필터(양방향)와 갈리는 지점.
+      expect(body.isBlocked).toBe(false);
+    });
+
+    it('404: 없는 유저', async () => {
+      const { status, body } = await getUser(
+        '0198c5b2-2f74-7abc-8def-0123456789ab',
+      );
+      expect(status).toBe(404);
+      expect(body.errorCode).toBe('USER_NOT_FOUND');
+    });
+
+    it('404: 탈퇴한 유저 — 비존재와 구분하지 않는다', async () => {
+      await request(server)
+        .delete('/users/me')
+        .set('Authorization', `Bearer ${otherToken}`)
+        .expect(204);
+
+      const { status, body } = await getUser(otherId, meToken);
+      expect(status).toBe(404);
+      expect(body.errorCode).toBe('USER_NOT_FOUND');
+    });
+
+    it('400: uuid가 아닌 id — me 라우트가 여기로 새지 않는지의 대조군', async () => {
+      const { status } = await getUser('not-a-uuid');
+      expect(status).toBe(400);
+    });
+
+    it('200: /users/me는 여전히 me 라우트다 — :userId가 삼키지 않는다', async () => {
+      const { status, body } = await getMe(meToken);
+      expect(status).toBe(200);
+      // 본인 전용 값이 살아있다 = :userId 핸들러로 새지 않았다.
+      expect(body.email).toBe('test@example.com');
+    });
+
+    it('401: 손상된 토큰 — 만료를 익명으로 조용히 강등하지 않는다', async () => {
+      const { status, body } = await getUser(otherId, 'not-a-jwt');
+      expect(status).toBe(401);
+      expect(body.errorCode).toBe('UNAUTHENTICATED');
+    });
+
+    it('뷰어별 응답이라 공유 캐시를 금지한다', async () => {
+      const res = await request(server).get(`/users/${otherId}`);
+      expect(res.headers['cache-control']).toBe('private, no-store');
+      expect(res.headers['vary']).toContain('Authorization');
+    });
+  });
 });

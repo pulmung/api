@@ -3,13 +3,16 @@ import {
   Controller,
   Delete,
   Get,
+  Header,
   HttpCode,
   HttpStatus,
+  Param,
   Patch,
 } from '@nestjs/common';
 import { ApiNoContentResponse } from '@nestjs/swagger';
 import { ZodResponse } from 'nestjs-zod';
 import { Authenticated } from '../../auth/presentation/authenticated.decorator';
+import { OptionalAuth } from '../../auth/presentation/optional-auth.decorator';
 import { CurrentUser } from '../../../common/auth/current-user.decorator';
 import type { AuthUser } from '../../../common/auth/auth-user';
 import { ApiErrors } from '../../../common/swagger/api-errors.decorator';
@@ -24,6 +27,7 @@ import {
   UserNotFoundError,
 } from '../domain/user.error';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { UserDetailDto, UserIdParamDto } from './dto/user-detail.dto';
 import { UserProfileDto } from './dto/user-profile.dto';
 
 @Controller('users')
@@ -104,5 +108,43 @@ export class UserController {
   })
   async remove(@CurrentUser() user: AuthUser): Promise<void> {
     await this.deleteUser.execute({ id: user.id });
+  }
+
+  // ⚠️ **`me` 라우트들보다 반드시 아래**에 선언한다 — `:userId`가 `me`를 삼킨다. 같은
+  // 컨트롤러에선 선언 순서가 유일한 방어선이고, 위로 올리면 `GET /users/me`가 조용히
+  // "userId가 'me'인 유저 조회"가 되어 400(uuid 아님)이 된다(BlockController가 `me/blocks`를
+  // `:userId/block` 위에 둔 것과 같은 규율 — 그쪽은 세그먼트 수가 달라 아직 여유가 있다).
+  //
+  // 뷰어별 isBlocked가 실리므로 공개(무표시)가 아니라 @OptionalAuth다 — 토큰 없으면 익명
+  // 통과(isBlocked: false), 있는데 잘못됐으면 401(만료를 익명으로 조용히 강등하지 않는다).
+  @Get(':userId')
+  @OptionalAuth()
+  // 뷰어별 응답이라 공유 캐시 금지 — 없으면 A의 isBlocked가 B에게 갈 수 있다(post 목록과 동일).
+  @Header('Cache-Control', 'private, no-store')
+  @Header('Vary', 'Authorization')
+  @ApiErrors(UserNotFoundError)
+  @ZodResponse({
+    status: 200,
+    description:
+      '유저 공개 프로필 — 닉네임·아바타·가입일. 본인 전용 값(provider·email)은 나가지 않는다' +
+      '(그건 GET /users/me). 내 id로 호출해도 같은 공개 표현이다. ' +
+      '인증 시 isBlocked가 뷰어 기준으로 채워진다(단방향 — 내가 상대를 차단했는지만). ' +
+      '**차단한 상대의 프로필도 200이다** — 차단은 목록 필터일 뿐 접근 차단이 아니다. ' +
+      '없는 유저·탈퇴한 유저는 404. ' +
+      '⚠️ 헤더를 보냈는데 토큰이 만료·손상됐으면 401이다 — 클라의 토큰 갱신 인터셉터가 ' +
+      '이 공개 라우트도 커버해야 한다',
+    type: UserDetailDto,
+  })
+  async detail(
+    @Param() params: UserIdParamDto,
+    @CurrentUser() user: AuthUser | undefined,
+  ): Promise<UserDetailDto> {
+    const profile = await this.userQuery.findPublicProfile(
+      params.userId,
+      user?.id,
+    );
+    // 탈퇴·비존재를 구분하지 않는다 — 밖에서 보면 같은 상태다.
+    if (!profile) throw new UserNotFoundError();
+    return profile;
   }
 }

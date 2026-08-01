@@ -60,6 +60,7 @@ presentation → application → domain ← (repository | infrastructure)
 - **뷰어가 없으면 조건을 붙이지 않는다** — 조각이 `viewerId`가 없을 때 `undefined`를 반환해 `and(...)`가 건너뛰게 한다(기존 `cursor ? gt(...) : undefined` 관례와 같은 모양). 가시성은 뷰어별 개념이라 익명에겐 존재하지 않는다.
 - **필터가 붙는 라우트는 `@OptionalAuth()` + `Cache-Control: private, no-store` + `Vary: Authorization`이 함께 간다**(§10). 응답이 뷰어마다 갈리므로 공유 캐시가 A의 응답을 B에게 주면 필터가 무의미해진다. ⚠️ 이 때문에 **원래 공개(무표시)였던 라우트가 계약을 바꾼다** — 댓글 목록 2개가 실제로 그렇게 전환됐다(스펙의 `security`가 바뀌어 web codegen에 전파).
 - **비정규화 카운터는 이 필터를 못 받는다** — 전역 값이라 뷰어별로 계산할 수 없다(`posts.commentCount`). 반면 실시간 집계는 같은 조건을 받아야 한다(`replyCount`). 이 비대칭은 결함이 아니라 판정 결과다: **불일치가 같은 화면 안에서 드러나는가**를 기준으로 갈랐다("답글 N개"를 눌러 다른 수가 나오면 즉시 보이지만, 목록↔상세 간 카운터 차이는 덜 드러난다).
+- ⚠️ **이 절은 "목록에서 행을 숨기는 조건"에만 적용된다 — 뷰어별 *플래그*는 다른 규칙이다.** 응답에 실리는 `isLiked`·`isBlocked` 같은 단일 행 불리언은 쿼리에 융합하지 않고 **별도 점조회 + 쿼리 서비스 조합**으로 만든다(`post.reader.findLikedPostIds`, `UserBlockReader.existsBlock`). 융합해야 하는 이유가 페이지 크기 정합성인데 플래그엔 그 문제가 없고, 조각 단일화가 필요한 이유가 조용한 fail-open인데 플래그 누락은 **응답 DTO의 required 필드가 비어 컴파일/직렬화에서 터진다**. 방향도 갈릴 수 있다 — 목록 필터는 양방향 차단을 보고, 프로필의 `isBlocked`는 **단방향**만 본다(역방향을 실으면 차단이 상대에게 드러나 조용한 조치가 아니게 된다).
 
 ---
 
@@ -180,6 +181,7 @@ features/<feature>/
     - **이 부류의 누락은 조용하지 않다** — 응답 DTO가 새 필드를 요구하고 reader projection이 추론으로 흐르므로 빠뜨리면 **컴파일 에러**다. 그래서 `excludeBlocked`(§2-1)와 달리 전용 E2E로 묶지 않는다: 테스트는 "전파됐는가"가 아니라 **값이 맞는가**(URL 조합·null 분기)만 본다.
   - 파일명 suffix가 종류를 마저 구분한다: `.dto.ts`(=`createZodDto` 클래스) / `.schema.ts`(=zod 객체·enum) / `.field(s).ts`(=필드 조각). 여기서 `.schema.ts`는 **zod 전용**이다 — DB 테이블 정의는 `.table.ts`를 쓴다([CLAUDE.md](../CLAUDE.md) "테이블 정의 파일"). 같은 접미사를 쓰면 리소스명이 겹칠 때 Cmd+P가 두 레이어를 섞어 보여준다(실제 발생: `watering.schema.ts`). ⚠️ **`.schema.ts`가 `Dto` 클래스를 export하면 분류 실패 신호** — 그건 엔드포인트 계약이므로 `dto/*.dto.ts`다.
 - **응답 공유 기준 = "변경 이유가 같은가"**. 같으면 공유(`AuthTokensDto`를 login/signup/refresh가), 다르면 분리.
+  - **본인 전용 표현과 공개 표현은 항상 다르다** — 같은 리소스라도 `GET /users/me`(provider·email 포함)와 `GET /users/:userId`(공개 표현)는 스키마를 공유하지 않는다. 그리고 그 분리는 **DTO에서 끝나지 않고 reader까지 내려간다**: 공개 경로 전용 projection을 따로 둬서(`UserReader.findPublicById`) 민감 컬럼을 **애초에 select하지 않는다**. 응답 스키마의 strip(`additionalProperties: false`)에만 기대면 매핑 실수 한 번이 곧 누출이고, 부분 select는 이미 "옵트인 프로젝션"이라 같은 규율의 연장이다. 공개 표현 쪽은 대신 공유 조각(`UserSummarySchema`/`userSummaryColumns`)에서 **파생**해 남에게 보이는 모양이 화면마다 갈리지 않게 한다.
 - **생성(POST) 201 응답 = 그 리소스의 조회 표현**(REST 관례: 201 body ≒ GET 표현). 별도 "생성 응답 DTO"를 만들지 않고 조회 DTO를 재사용하며, 컨트롤러가 생성 직후 reader로 재조회해 반환한다 — 쿼리 1개를 내고 생성/조회 표현의 이원화를 구조적으로 차단. (예: POST /plants·GET /plants/:id가 `PlantDetailDto` 공유.)
 - 모듈 간 응답 중첩 회피 → 순환 방지장치(`base.response`)가 애초에 불필요. 각 DTO는 자기 endpoint의 계약(optional 떡칠 만능 DTO 금지 = 거짓말 금지).
 - nestjs-zod: 요청 `createZodDto` + 글로벌 `ZodValidationPipe`. 응답 **`@ZodResponse`**(직렬화 + OpenAPI 문서 + 컴파일 반환검증, 공식 권장 / `@ZodSerializerDto`보다 우위). 문서화는 `.meta({ description, example })` / `.describe()`.
@@ -203,7 +205,7 @@ features/<feature>/
 - **무상태 검증**: 서명 + 만료 + **알고리즘 고정(`algorithms: ['HS256']`)** 만 확인하고 `sub`를 신뢰 → `req.user = { id }`. 매 요청 DB 조회 없음(폐기/밴은 refresh 경계의 DB 세션이 책임 — access는 짧게 산다). 실패는 형태 불문 **단일 `UnauthenticatedError`(401)** 로 통일(만료/위조 구분 안 함 = oracle 회피). `sub`가 문자열이 아니면 거부.
 - **가드는 opt-in — 전역 `APP_GUARD`가 아니다**(§13). 라우트에 데코레이터로 붙인다(`features/auth/presentation/`):
   - `@Authenticated()` = `UseGuards(JwtAuthGuard)` + `@ApiBearerAuth()` + `@ApiErrors(UnauthenticatedError)` 합성 → **가드(enforcement) + OpenAPI 문서**를 한 데코로. 보호 라우트에.
-  - `@OptionalAuth()` = `UseGuards(JwtAuthGuard)` + `SetMetadata(IS_OPTIONAL_AUTH_KEY)` + `@ApiErrors(UnauthenticatedError)` + **`@ApiOperation({ security: [{}, { bearer: [] }] })`** → 토큰 없으면 익명 통과, 있으면 검증(잘못됐으면 401). 참조 구현: `GET /posts`·`GET /posts/:id`(뷰어별 `isLiked`) / `GET /posts/:postId/comments`·`GET /comments/:id/replies`(뷰어별 차단 필터 — 원래 공개였다가 §2-1 도입으로 전환된 사례).
+  - `@OptionalAuth()` = `UseGuards(JwtAuthGuard)` + `SetMetadata(IS_OPTIONAL_AUTH_KEY)` + `@ApiErrors(UnauthenticatedError)` + **`@ApiOperation({ security: [{}, { bearer: [] }] })`** → 토큰 없으면 익명 통과, 있으면 검증(잘못됐으면 401). 참조 구현: `GET /posts`·`GET /posts/:id`(뷰어별 `isLiked`) / `GET /posts/:postId/comments`·`GET /comments/:id/replies`(뷰어별 차단 필터 — 원래 공개였다가 §2-1 도입으로 전환된 사례) / `GET /users/:userId`(뷰어별 `isBlocked` — 프로필은 공개지만 차단 버튼 상태가 뷰어별이라 처음부터 이 표시로 열린 사례).
     - ⚠️ 여기서만 `@ApiBearerAuth()`를 쓰지 않는다 — 그건 `security: [{ bearer: [] }]`(= **인증 필수**)를 내보내 공개 라우트를 거짓말하게 만들고, codegen이 토큰을 필수 인자로 뽑는다. 빈 요구사항 `{}`를 **먼저** 둔 배열이 "무인증도 허용"의 OpenAPI 표기다(§9 계약 정확성).
     - ⚠️ 가드는 **헤더가 아예 없을 때만** 익명 통과시킨다. 헤더를 보냈는데 만료·손상이면 401이다(만료를 익명으로 조용히 강등하지 않는다) → 클라의 토큰 갱신 인터셉터가 이 "공개" 라우트도 커버해야 한다.
     - ⚠️ 응답이 뷰어별로 갈리므로 해당 라우트엔 `Cache-Control: private, no-store` + `Vary: Authorization`이 함께 간다 — 없으면 공유 캐시가 A의 응답을 B에게 준다.
