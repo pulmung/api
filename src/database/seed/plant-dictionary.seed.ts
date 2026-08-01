@@ -65,7 +65,9 @@ function validate(data: PlantDictionaryData): void {
     for (const name of speciesNames) {
       assertValidName(name, `속 "${genus}"의 종 "${name}"`);
       if (seen.has(name)) {
-        throw new Error(`시드 데이터 오류: 속 "${genus}"에 종 "${name}"이 중복됨`);
+        throw new Error(
+          `시드 데이터 오류: 속 "${genus}"에 종 "${name}"이 중복됨`,
+        );
       }
       seen.add(name);
     }
@@ -74,6 +76,8 @@ function validate(data: PlantDictionaryData): void {
 
 function assertValidName(name: string, label: string): void {
   if (name.length === 0 || name !== name.trim()) {
-    throw new Error(`시드 데이터 오류: ${label} — 빈 이름이거나 앞뒤 공백 포함`);
+    throw new Error(
+      `시드 데이터 오류: ${label} — 빈 이름이거나 앞뒤 공백 포함`,
+    );
   }
 }

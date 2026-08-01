@@ -64,7 +64,10 @@ describe('UserPlantRead (e2e)', () => {
     await db.delete(plants);
   });
 
-  const getList = async (query: Record<string, string> = {}, token?: string) => {
+  const getList = async (
+    query: Record<string, string> = {},
+    token?: string,
+  ) => {
     let req = request(server).get('/user-plants').query(query);
     if (token) req = req.set('Authorization', `Bearer ${token}`);
     const res = await req;

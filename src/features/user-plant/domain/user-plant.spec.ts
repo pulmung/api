@@ -85,7 +85,10 @@ describe('UserPlant.create', () => {
 
   it.each([
     ['1자 (최소)', 'a'],
-    [`${USER_PLANT_NAME_MAX_LENGTH}자 (최대)`, 'a'.repeat(USER_PLANT_NAME_MAX_LENGTH)],
+    [
+      `${USER_PLANT_NAME_MAX_LENGTH}자 (최대)`,
+      'a'.repeat(USER_PLANT_NAME_MAX_LENGTH),
+    ],
   ])('이름 경계값 %s 은 통과한다', (_, name) => {
     expect(() => UserPlant.create({ ...valid, name })).not.toThrow();
   });
@@ -105,7 +108,10 @@ describe('UserPlant.create', () => {
       images(USER_PLANT_IMAGES_MAX + 1),
     ],
     // 카탈로그 purpose의 key 재사용이 현실적인 오용 시나리오다.
-    ['잘못된 prefix (카탈로그 purpose의 key)', [{ key: 'plant-image/0198.jpg' }]],
+    [
+      '잘못된 prefix (카탈로그 purpose의 key)',
+      [{ key: 'plant-image/0198.jpg' }],
+    ],
     ['중복 key', [image(1), image(1)]],
   ])('이미지가 %s 이면 InvalidUserPlantImagesError', (_, imgs) => {
     expect(() => UserPlant.create({ ...valid, images: imgs })).toThrow(
@@ -115,7 +121,10 @@ describe('UserPlant.create', () => {
 
   it('width/height 없는 이미지도 허용한다 (선택 힌트)', () => {
     expect(() =>
-      UserPlant.create({ ...valid, images: [{ key: 'user-plant-image/x.jpg' }] }),
+      UserPlant.create({
+        ...valid,
+        images: [{ key: 'user-plant-image/x.jpg' }],
+      }),
     ).not.toThrow();
   });
 
@@ -134,8 +143,14 @@ describe('UserPlant.create', () => {
   });
 
   it.each([
-    [`${WATERING_INTERVAL_MIN_DAYS - 1} (최소 미만)`, WATERING_INTERVAL_MIN_DAYS - 1],
-    [`${WATERING_INTERVAL_MAX_DAYS + 1} (최대 초과)`, WATERING_INTERVAL_MAX_DAYS + 1],
+    [
+      `${WATERING_INTERVAL_MIN_DAYS - 1} (최소 미만)`,
+      WATERING_INTERVAL_MIN_DAYS - 1,
+    ],
+    [
+      `${WATERING_INTERVAL_MAX_DAYS + 1} (최대 초과)`,
+      WATERING_INTERVAL_MAX_DAYS + 1,
+    ],
     ['1.5 (비정수)', 1.5],
   ])('물주기 간격이 %s 이면 InvalidWateringIntervalError', (_, days) => {
     expect(() =>
@@ -208,7 +223,10 @@ describe('UserPlantPatch.create', () => {
 
   it.each([
     ['1자 (최소)', 'a'],
-    [`${USER_PLANT_NAME_MAX_LENGTH}자 (최대)`, 'a'.repeat(USER_PLANT_NAME_MAX_LENGTH)],
+    [
+      `${USER_PLANT_NAME_MAX_LENGTH}자 (최대)`,
+      'a'.repeat(USER_PLANT_NAME_MAX_LENGTH),
+    ],
   ])('이름 경계값 %s 은 통과한다', (_, name) => {
     expect(() => UserPlantPatch.create({ name })).not.toThrow();
   });
@@ -218,7 +236,10 @@ describe('UserPlantPatch.create', () => {
       `${USER_PLANT_IMAGES_MAX + 1}장 (최대 초과)`,
       images(USER_PLANT_IMAGES_MAX + 1),
     ],
-    ['잘못된 prefix (카탈로그 purpose의 key)', [{ key: 'plant-image/0198.jpg' }]],
+    [
+      '잘못된 prefix (카탈로그 purpose의 key)',
+      [{ key: 'plant-image/0198.jpg' }],
+    ],
     ['중복 key', [image(1), image(1)]],
   ])('이미지가 %s 이면 InvalidUserPlantImagesError', (_, imgs) => {
     expect(() => UserPlantPatch.create({ images: imgs })).toThrow(
@@ -228,12 +249,18 @@ describe('UserPlantPatch.create', () => {
 
   // 제공된 간격은 create와 같은 범위 불변식을 통과해야 한다(검증 공유).
   it.each([
-    [`${WATERING_INTERVAL_MIN_DAYS - 1} (최소 미만)`, WATERING_INTERVAL_MIN_DAYS - 1],
-    [`${WATERING_INTERVAL_MAX_DAYS + 1} (최대 초과)`, WATERING_INTERVAL_MAX_DAYS + 1],
+    [
+      `${WATERING_INTERVAL_MIN_DAYS - 1} (최소 미만)`,
+      WATERING_INTERVAL_MIN_DAYS - 1,
+    ],
+    [
+      `${WATERING_INTERVAL_MAX_DAYS + 1} (최대 초과)`,
+      WATERING_INTERVAL_MAX_DAYS + 1,
+    ],
     ['1.5 (비정수)', 1.5],
   ])('물주기 간격이 %s 이면 InvalidWateringIntervalError', (_, days) => {
-    expect(() =>
-      UserPlantPatch.create({ wateringIntervalDays: days }),
-    ).toThrow(InvalidWateringIntervalError);
+    expect(() => UserPlantPatch.create({ wateringIntervalDays: days })).toThrow(
+      InvalidWateringIntervalError,
+    );
   });
 });

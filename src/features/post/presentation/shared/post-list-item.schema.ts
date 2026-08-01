@@ -25,7 +25,8 @@ export const PostListItemSchema = z.object({
     .nullable()
     .meta({ description: '태그된 카탈로그 식물 — 무관한 글이면 null' }),
   commentCount: z.int().min(0).meta({
-    description: '살아있는 댓글 수(루트+답글) — 삭제(soft delete 포함) 즉시 감소',
+    description:
+      '살아있는 댓글 수(루트+답글) — 삭제(soft delete 포함) 즉시 감소',
   }),
   likeCount: z.int().min(0).meta({
     description: '좋아요 수 — 뷰어와 무관한 전역 수치',

@@ -65,7 +65,9 @@ describe('UserPlant (e2e)', () => {
       .insert(plants)
       .values({
         name: '몬스테라 알보',
-        images: [{ key: 'plant-image/0198c5b2-2f74-7abc-8def-0000000000ca.jpg' }],
+        images: [
+          { key: 'plant-image/0198c5b2-2f74-7abc-8def-0000000000ca.jpg' },
+        ],
       })
       .returning({ id: plants.id, name: plants.name });
     return row;

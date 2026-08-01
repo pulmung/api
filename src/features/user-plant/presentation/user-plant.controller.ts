@@ -154,7 +154,8 @@ export class UserPlantController {
     // 수정 200 = 조회 표현(재조회) — POST 201과 동일 패턴, 수정/조회 응답의 동일성을 구조로 보장.
     const userPlant = await this.userPlantQuery.findById(params.id, user.id);
     // 방금 수정한 행이라 실패는 불변식 위반 — 404가 아니라 500(unexpected)이 정직하다.
-    if (!userPlant) throw new Error(`updated user plant not readable: ${params.id}`);
+    if (!userPlant)
+      throw new Error(`updated user plant not readable: ${params.id}`);
     return userPlant;
   }
 

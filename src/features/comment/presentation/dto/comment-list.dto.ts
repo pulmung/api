@@ -54,7 +54,8 @@ const RootCommentItemSchema = z.discriminatedUnion('deleted', [
 
 const CommentListSchema = z.object({
   comments: z.array(RootCommentItemSchema).meta({
-    description: '루트 댓글만(등록순) — 답글은 GET /comments/:id/replies로 지연 로드',
+    description:
+      '루트 댓글만(등록순) — 답글은 GET /comments/:id/replies로 지연 로드',
   }),
   nextCursor: z.uuid().nullable().meta({
     description: '다음 페이지 cursor — null이면 마지막 페이지',

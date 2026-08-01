@@ -36,18 +36,50 @@ describe('processPostContent — 정화 (Pass A)', () => {
   });
 
   it.each([
-    ['script 태그+내용 통째 드랍', '<p>a</p><script>alert(1)</script>', '<p>a</p>'],
-    ['style 태그+내용 통째 드랍', '<p>a</p><style>p{color:red}</style>', '<p>a</p>'],
-    ['iframe 제거(텍스트 없음)', '<p>a</p><iframe src="https://evil.example"></iframe>', '<p>a</p>'],
-    ['비허용 태그는 벗기고 텍스트 보존', '<h1>제목</h1><div><p>본문</p></div>', '제목<p>본문</p>'],
+    [
+      'script 태그+내용 통째 드랍',
+      '<p>a</p><script>alert(1)</script>',
+      '<p>a</p>',
+    ],
+    [
+      'style 태그+내용 통째 드랍',
+      '<p>a</p><style>p{color:red}</style>',
+      '<p>a</p>',
+    ],
+    [
+      'iframe 제거(텍스트 없음)',
+      '<p>a</p><iframe src="https://evil.example"></iframe>',
+      '<p>a</p>',
+    ],
+    [
+      '비허용 태그는 벗기고 텍스트 보존',
+      '<h1>제목</h1><div><p>본문</p></div>',
+      '제목<p>본문</p>',
+    ],
     ['이벤트 핸들러 속성 제거', '<p onclick="alert(1)">a</p>', '<p>a</p>'],
-    ['style 속성 제거 (인라인 색 금지 — 팔레트 class만)', '<p style="color:#000">a</p>', '<p>a</p>'],
-    ['span의 팔레트 외 class 제거', '<span class="evil">a</span>', '<span>a</span>'],
-    ['팔레트 class는 유지, 비팔레트만 걸러냄', '<span class="color-blue evil">a</span>', '<span class="color-blue">a</span>'],
+    [
+      'style 속성 제거 (인라인 색 금지 — 팔레트 class만)',
+      '<p style="color:#000">a</p>',
+      '<p>a</p>',
+    ],
+    [
+      'span의 팔레트 외 class 제거',
+      '<span class="evil">a</span>',
+      '<span>a</span>',
+    ],
+    [
+      '팔레트 class는 유지, 비팔레트만 걸러냄',
+      '<span class="color-blue evil">a</span>',
+      '<span class="color-blue">a</span>',
+    ],
     ['b→strong 정규화', '<p><b>a</b></p>', '<p><strong>a</strong></p>'],
     ['del→s 정규화', '<p><del>a</del></p>', '<p><s>a</s></p>'],
     ['strike→s 정규화', '<p><strike>a</strike></p>', '<p><s>a</s></p>'],
-    ['a 태그 제거(텍스트 보존) — 링크 미지원', '<p><a href="https://x.example">링크</a></p>', '<p>링크</p>'],
+    [
+      'a 태그 제거(텍스트 보존) — 링크 미지원',
+      '<p><a href="https://x.example">링크</a></p>',
+      '<p>링크</p>',
+    ],
   ])('%s', (_, input, expected) => {
     expect(process(input).content).toBe(expected);
   });
@@ -61,7 +93,10 @@ describe('processPostContent — 정화 (Pass A)', () => {
 
   it.each([
     ['외부 도메인', 'https://evil.example/post-image/x.jpg'],
-    ['우리 CDN이지만 다른 purpose(plant-image)', `${BASE_URL}/plant-image/x.jpg`],
+    [
+      '우리 CDN이지만 다른 purpose(plant-image)',
+      `${BASE_URL}/plant-image/x.jpg`,
+    ],
     ['src 없음', ''],
     ['javascript: 스킴', 'javascript:alert(1)'],
   ])('img src가 %s이면 InvalidPostImageSrcError', (_, src) => {

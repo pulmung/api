@@ -20,7 +20,10 @@ const UpdateUserPlantSchema = z
       .min(1)
       .max(USER_PLANT_NAME_MAX_LENGTH)
       .optional()
-      .meta({ description: '개체 애칭 — 항상 있어야 하는 필드라 null 불가', example: '초록이' }),
+      .meta({
+        description: '개체 애칭 — 항상 있어야 하는 필드라 null 불가',
+        example: '초록이',
+      }),
     plantId: z.uuid().nullable().optional().meta({
       description:
         '카탈로그(plants) 연결 — 값 = 동정 승격(연결), null = 연결 해제(미동정으로 강등)',

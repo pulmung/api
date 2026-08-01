@@ -23,7 +23,11 @@ describe('PlantDictionary (e2e)', () => {
     // 정렬 검증을 위해 비가나다순으로 삽입한다.
     await db
       .insert(genera)
-      .values([{ name: '필로덴드론' }, { name: '몬스테라' }, { name: '안스리움' }]);
+      .values([
+        { name: '필로덴드론' },
+        { name: '몬스테라' },
+        { name: '안스리움' },
+      ]);
     await db.insert(species).values([
       { genus: '몬스테라', name: '아단소니' },
       { genus: '몬스테라', name: '델리시오사' },
@@ -40,7 +44,9 @@ describe('PlantDictionary (e2e)', () => {
   it('200: GET /genera — 전체 속 가나다순 + Cache-Control', async () => {
     const res = await request(server).get('/genera');
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ genera: ['몬스테라', '안스리움', '필로덴드론'] });
+    expect(res.body).toEqual({
+      genera: ['몬스테라', '안스리움', '필로덴드론'],
+    });
     expect(res.headers['cache-control']).toBe(
       'public, max-age=3600, stale-while-revalidate=86400',
     );

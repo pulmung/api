@@ -20,9 +20,11 @@ import { DRIZZLE, type DrizzleDB } from './drizzle.constants';
  * TTx가 `DrizzleDB`인 이유: drizzle의 트랜잭션 핸들은 db와 같은 베이스(`PgAsyncDatabase`)를
  * 상속해 쿼리 API가 동일하다 → 소비처(writer)가 분기 없이 하나의 타입으로 다룬다.
  */
-export class DrizzleTransactionalAdapter
-  implements TransactionalAdapter<DrizzleDB, DrizzleDB, PgTransactionConfig>
-{
+export class DrizzleTransactionalAdapter implements TransactionalAdapter<
+  DrizzleDB,
+  DrizzleDB,
+  PgTransactionConfig
+> {
   connectionToken = DRIZZLE;
 
   optionsFactory = (drizzle: DrizzleDB) => ({

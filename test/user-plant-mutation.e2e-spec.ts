@@ -60,7 +60,11 @@ describe('UserPlantMutation (e2e)', () => {
     fakeStorage.missingKeys.clear();
   });
 
-  const patchUserPlant = async (id: string, payload: object, token?: string) => {
+  const patchUserPlant = async (
+    id: string,
+    payload: object,
+    token?: string,
+  ) => {
     let req = request(server).patch(`/user-plants/${id}`);
     if (token) req = req.set('Authorization', `Bearer ${token}`);
     const res = await req.send(payload);
@@ -108,7 +112,11 @@ describe('UserPlantMutation (e2e)', () => {
     it('200: 단일 필드({name}) — 나머지 필드는 건드리지 않는다 (merge-patch 핵심)', async () => {
       const id = await insertUserPlant();
 
-      const { status, body } = await patchUserPlant(id, { name: '새이름' }, ownerToken);
+      const { status, body } = await patchUserPlant(
+        id,
+        { name: '새이름' },
+        ownerToken,
+      );
       expect(status).toBe(200);
       expect(body).toEqual({
         id,
@@ -209,7 +217,11 @@ describe('UserPlantMutation (e2e)', () => {
     it('200: {images: []} — 전체 제거', async () => {
       const id = await insertUserPlant();
 
-      const { status, body } = await patchUserPlant(id, { images: [] }, ownerToken);
+      const { status, body } = await patchUserPlant(
+        id,
+        { images: [] },
+        ownerToken,
+      );
       expect(status).toBe(200);
       expect(body.images).toEqual([]);
     });
@@ -217,7 +229,11 @@ describe('UserPlantMutation (e2e)', () => {
     it('200: 물주기 간격 설정({wateringIntervalDays: 7}) → null 해제 — 부재(미변경)와 구분', async () => {
       const id = await insertUserPlant({ wateringIntervalDays: null });
 
-      const set = await patchUserPlant(id, { wateringIntervalDays: 7 }, ownerToken);
+      const set = await patchUserPlant(
+        id,
+        { wateringIntervalDays: 7 },
+        ownerToken,
+      );
       expect(set.status).toBe(200);
       expect(set.body.wateringIntervalDays).toBe(7);
 
@@ -272,7 +288,11 @@ describe('UserPlantMutation (e2e)', () => {
       // 저장된 key가 S3에서 사라졌더라도(수명주기 등) images를 안 건드리는 패치는 성공해야 한다.
       fakeStorage.missingKeys.add('user-plant-image/stored.jpg');
 
-      const { status } = await patchUserPlant(id, { name: '새이름' }, ownerToken);
+      const { status } = await patchUserPlant(
+        id,
+        { name: '새이름' },
+        ownerToken,
+      );
       expect(status).toBe(200);
     });
 

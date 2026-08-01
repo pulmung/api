@@ -38,7 +38,9 @@ export class LikePostUseCase {
       // 방금 삽입한 좋아요의 FK가 글 행에 KEY SHARE를 걸고 있어 동시 삭제가 못 끼어든다
       // — 여기서 0행은 불변식 위반이므로 404가 아니라 500이 정직하다.
       if (likeCount === null) {
-        throw new Error(`post vanished while counting likes: ${command.postId}`);
+        throw new Error(
+          `post vanished while counting likes: ${command.postId}`,
+        );
       }
       return likeCount;
     }

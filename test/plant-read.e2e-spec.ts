@@ -66,7 +66,11 @@ describe('PlantRead (e2e)', () => {
             images:
               n === 25
                 ? [
-                    { key: 'plant-image/cover-25.jpg', width: 800, height: 600 },
+                    {
+                      key: 'plant-image/cover-25.jpg',
+                      width: 800,
+                      height: 600,
+                    },
                     { key: 'plant-image/extra-25.jpg' },
                   ]
                 : [{ key: `plant-image/p-${n}.jpg` }],
@@ -93,11 +97,17 @@ describe('PlantRead (e2e)', () => {
       expect(page1.body.plants).toHaveLength(10);
       expect(page1.body.nextCursor).toBe(plantId(16));
 
-      const page2 = await getPlants({ limit: '10', cursor: page1.body.nextCursor! });
+      const page2 = await getPlants({
+        limit: '10',
+        cursor: page1.body.nextCursor!,
+      });
       expect(page2.body.plants).toHaveLength(10);
       expect(page2.body.nextCursor).toBe(plantId(6));
 
-      const page3 = await getPlants({ limit: '10', cursor: page2.body.nextCursor! });
+      const page3 = await getPlants({
+        limit: '10',
+        cursor: page2.body.nextCursor!,
+      });
       expect(page3.body.plants).toHaveLength(5);
       expect(page3.body.nextCursor).toBeNull();
 

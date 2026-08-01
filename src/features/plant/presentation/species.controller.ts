@@ -12,7 +12,8 @@ export class SpeciesController {
   @Header('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400')
   @ZodResponse({
     status: 200,
-    description: '종(species) 사전 — 선택한 속의 종만 (이름 가나다순, 미등록 속은 빈 배열)',
+    description:
+      '종(species) 사전 — 선택한 속의 종만 (이름 가나다순, 미등록 속은 빈 배열)',
     type: SpeciesDto,
   })
   async list(@Query() query: SpeciesQueryDto): Promise<SpeciesDto> {

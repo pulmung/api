@@ -294,7 +294,9 @@ describe('Watering (e2e)', () => {
       ];
       await db
         .insert(waterings)
-        .values(dates.map((wateredOn) => ({ userPlantId: plantId, wateredOn })));
+        .values(
+          dates.map((wateredOn) => ({ userPlantId: plantId, wateredOn })),
+        );
 
       const page1 = await getWaterings(plantId, { limit: '2' }, ownerToken);
       expect(page1.body.waterings.map((w) => w.wateredOn)).toEqual([
@@ -443,7 +445,11 @@ describe('Watering (e2e)', () => {
 
     it('400: wateringId 비uuid (Zod)', async () => {
       const plantId = await insertUserPlant();
-      const { status } = await deleteWatering(plantId, 'not-a-uuid', ownerToken);
+      const { status } = await deleteWatering(
+        plantId,
+        'not-a-uuid',
+        ownerToken,
+      );
       expect(status).toBe(400);
     });
   });

@@ -30,7 +30,9 @@ export class UnlikePostUseCase {
       // 방금 지운 좋아요 행을 우리가 잡고 있어 글 삭제 cascade가 먼저 커밋될 수 없다
       // (그 경합은 교착으로 드러나지 0행으로 새지 않는다) — 0행은 불변식 위반.
       if (likeCount === null) {
-        throw new Error(`post vanished while counting likes: ${command.postId}`);
+        throw new Error(
+          `post vanished while counting likes: ${command.postId}`,
+        );
       }
       return likeCount;
     }

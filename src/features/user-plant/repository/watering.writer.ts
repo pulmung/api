@@ -50,7 +50,9 @@ export class WateringWriter {
               // 상수 프로젝션은 ::uuid/::date 캐스트로 타입을 못 박는다(파라미터 추론 회피).
               id: sql<string>`${uuidv7()}::uuid`.as('id'),
               userPlantId: userPlants.id,
-              wateredOn: sql<string>`${params.wateredOn}::date`.as('watered_on'),
+              wateredOn: sql<string>`${params.wateredOn}::date`.as(
+                'watered_on',
+              ),
               createdAt: sql<Date>`now()`.as('created_at'),
             })
             .from(userPlants)

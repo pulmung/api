@@ -11,7 +11,8 @@ export class PostLikeParamDto extends createZodDto(PostLikeParamSchema) {}
 // 두 라우트가 상태만 반대로 담으므로 분리하면 같은 스키마가 둘로 복제된다(§9).
 const PostLikeSchema = z.object({
   isLiked: z.boolean().meta({
-    description: '요청 후 내 좋아요 상태 — PUT이면 항상 true, DELETE면 항상 false',
+    description:
+      '요청 후 내 좋아요 상태 — PUT이면 항상 true, DELETE면 항상 false',
   }),
   likeCount: z.int().min(0).meta({
     description:

@@ -31,7 +31,8 @@ const CreatePostSchema = z.object({
         '<p>우리집 <strong>몬스테라</strong> 잎끝이 <span class="color-red">갈색</span>으로 변해요</p>',
     }),
   plantId: z.uuid().optional().meta({
-    description: '카탈로그(plants) 식물 태그 — 특정 식물에 관한 글이 아니면 생략',
+    description:
+      '카탈로그(plants) 식물 태그 — 특정 식물에 관한 글이 아니면 생략',
   }),
 });
 

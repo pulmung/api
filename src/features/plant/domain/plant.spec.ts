@@ -64,7 +64,10 @@ describe('Plant.create', () => {
 
   it.each([
     ['공백뿐 (trim 후 0자)', '   '],
-    [`${PLANT_NAME_MAX_LENGTH + 1}자 (최대 초과)`, 'a'.repeat(PLANT_NAME_MAX_LENGTH + 1)],
+    [
+      `${PLANT_NAME_MAX_LENGTH + 1}자 (최대 초과)`,
+      'a'.repeat(PLANT_NAME_MAX_LENGTH + 1),
+    ],
   ])('이름이 %s 이면 InvalidPlantNameError', (_, name) => {
     expect(() => Plant.create({ ...valid, name })).toThrow(
       InvalidPlantNameError,

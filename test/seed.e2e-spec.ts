@@ -90,9 +90,9 @@ describe('PlantDictionary seed (e2e)', () => {
     await expect(
       seedPlantDictionary(db, { 테스트속: ['가', '가'] }),
     ).rejects.toThrow('중복');
-    await expect(
-      seedPlantDictionary(db, { ' 공백속': [] }),
-    ).rejects.toThrow('공백');
+    await expect(seedPlantDictionary(db, { ' 공백속': [] })).rejects.toThrow(
+      '공백',
+    );
 
     // 아무것도 안 들어갔다 — validate가 트랜잭션보다 먼저임을 증명
     expect(await countRows()).toEqual({

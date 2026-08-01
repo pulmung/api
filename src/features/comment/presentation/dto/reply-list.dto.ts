@@ -6,7 +6,9 @@ import { UserSummarySchema } from '../../../user/presentation/shared/user-summar
 // parentId는 URL(:id)이 이미 말하므로 제외. 페이지 쿼리는 CommentPageQueryDto 공유.
 const ReplyItemSchema = z.object({
   id: z.uuid(),
-  content: z.string().meta({ example: '맞아요, 과습이 원인일 때가 많더라고요' }),
+  content: z
+    .string()
+    .meta({ example: '맞아요, 과습이 원인일 때가 많더라고요' }),
   author: UserSummarySchema.nullable().meta({
     description: '작성자 — **탈퇴한 유저의 답글이면 null**(답글은 남는다)',
   }),

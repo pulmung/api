@@ -107,7 +107,9 @@ describe('PostMutation (e2e) — PATCH·DELETE /posts/:id', () => {
       const row = await selectPost(postId(1));
       expect(row.title).toBe('새 제목');
       // 파생 4필드(content·excerpt·thumbnailKey·imageKeys)가 건드려지지 않았다.
-      expect(row.content).toBe(`<p>원래 본문</p><img src="${imgSrc(IMG_KEY)}" />`);
+      expect(row.content).toBe(
+        `<p>원래 본문</p><img src="${imgSrc(IMG_KEY)}" />`,
+      );
       expect(row.excerpt).toBe('원래 본문');
       expect(row.thumbnailKey).toBe(IMG_KEY);
       expect(row.imageKeys).toEqual([IMG_KEY]);
@@ -134,12 +136,18 @@ describe('PostMutation (e2e) — PATCH·DELETE /posts/:id', () => {
     it('200: plantId 값 = 태그 교체, null = 태그 해제', async () => {
       const [catalog] = await db
         .insert(plants)
-        .values({ name: '몬스테라 알보', images: [{ key: 'plant-image/c.jpg' }] })
+        .values({
+          name: '몬스테라 알보',
+          images: [{ key: 'plant-image/c.jpg' }],
+        })
         .returning({ id: plants.id });
       await insertPost({ id: postId(1) });
 
       const tagged = await patchPost(postId(1), { plantId: catalog.id });
-      expect(tagged.body.plant).toEqual({ id: catalog.id, name: '몬스테라 알보' });
+      expect(tagged.body.plant).toEqual({
+        id: catalog.id,
+        name: '몬스테라 알보',
+      });
 
       const untagged = await patchPost(postId(1), { plantId: null });
       expect(untagged.status).toBe(200);
@@ -172,7 +180,9 @@ describe('PostMutation (e2e) — PATCH·DELETE /posts/:id', () => {
     });
 
     it('404: 미존재 id → POST_NOT_FOUND', async () => {
-      const { status, body } = await patchPost(postId(999), { title: '새 제목' });
+      const { status, body } = await patchPost(postId(999), {
+        title: '새 제목',
+      });
       expect(status).toBe(404);
       expect(body.errorCode).toBe('POST_NOT_FOUND');
     });
@@ -190,7 +200,9 @@ describe('PostMutation (e2e) — PATCH·DELETE /posts/:id', () => {
 
     it('422: 내 글 + 비존재 plantId → REFERENCED_PLANT_NOT_FOUND', async () => {
       await insertPost({ id: postId(1) });
-      const { status, body } = await patchPost(postId(1), { plantId: uuidv7() });
+      const { status, body } = await patchPost(postId(1), {
+        plantId: uuidv7(),
+      });
       expect(status).toBe(422);
       expect(body.errorCode).toBe('REFERENCED_PLANT_NOT_FOUND');
     });

@@ -13,11 +13,12 @@ const CreateReportSchema = z.object({
       "신고 대상 종류. 'user'는 콘텐츠가 아니라 계정 자체(프로필·닉네임·반복 행위)",
   }),
   targetId: z.uuid().meta({
-    description: '대상 id — targetType에 해당하는 리소스. 없거나 삭제됐으면 404',
+    description:
+      '대상 id — targetType에 해당하는 리소스. 없거나 삭제됐으면 404',
   }),
   reason: z.enum(reportReasons).meta({
     description:
-      "신고 사유(닫힌 집합). 표시 문구는 클라가 소유한다 — 값은 안정적 식별자다. " +
+      '신고 사유(닫힌 집합). 표시 문구는 클라가 소유한다 — 값은 안정적 식별자다. ' +
       "'illegal'은 멸종위기종(CITES) 거래·불법 채집을 포함한다",
   }),
   // 최소수집(§11) — 심사 맥락을 적기에 충분하고 서술 이상을 담기엔 부족한 상한.
@@ -35,7 +36,8 @@ export class CreateReportDto extends createZodDto(CreateReportSchema) {}
 // 표현"(§9) 관례가 적용되지 않는다(그 관례는 조회 라우트가 존재할 때의 것).
 const ReportSchema = z.object({
   id: z.uuid().meta({
-    description: '접수 번호 — 문의 시 참조용. 조회 API는 없다(admin 전용 데이터)',
+    description:
+      '접수 번호 — 문의 시 참조용. 조회 API는 없다(admin 전용 데이터)',
   }),
   createdAt: z.iso.datetime().meta({ description: '접수 시각' }),
 });

@@ -63,7 +63,10 @@ export const comments = pgTable(
     // 글 삭제 = 스레드 소멸(cascade) — 루트·답글이 한 문장에 지워져 self-FK와 무충돌.
     postId: uuid()
       .notNull()
-      .references(() => posts.id, { name: FK_COMMENTS_POST, onDelete: 'cascade' }),
+      .references(() => posts.id, {
+        name: FK_COMMENTS_POST,
+        onDelete: 'cascade',
+      }),
     // 탈퇴 = 작성자만 소실(set null), 댓글은 남는다 — posts.authorId 전례(근거는 그쪽 doc).
     // 스레드 보존이 이 테이블의 삭제 정책이 세운 규율이므로 users cascade는 그 규율과
     // 모순이었다. ⚠️ load-bearing: 위 유예 ①②가 이 set null에 의존해 소멸한다.
