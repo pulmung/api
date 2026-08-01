@@ -39,8 +39,12 @@ import { PostLikeController } from './presentation/post-like.controller';
     PostReader,
     PostLikeWriter,
   ],
-  // posts 테이블의 쓰기는 이 모듈이 소유한다 — 비정규화 카운터(commentCount)를 같은
-  // 트랜잭션에서 증감해야 하는 CommentModule에 PostWriter를 공개한다("사용 → 소유" §3).
-  exports: [PostWriter],
+  // posts·post_likes 테이블의 쓰기는 이 모듈이 소유한다 — 비정규화 카운터를 같은
+  // 트랜잭션에서 증감해야 하는 소비처에 공개한다("사용 → 소유" §3):
+  //   CommentModule → PostWriter                  (commentCount)
+  //   UserModule    → PostWriter + PostLikeWriter (탈퇴 시 좋아요 정리 + likeCount 일괄 감소)
+  // ⚠️ 위 imports가 UserModule을 포함하지 않는다는 사실이 이제 load-bearing이다 —
+  //    포함하면 user ⇄ post 순환이 생긴다(users 의존은 계속 FK·읽기 join 레벨로만 둘 것).
+  exports: [PostWriter, PostLikeWriter],
 })
 export class PostModule {}

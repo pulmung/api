@@ -27,7 +27,9 @@ const CommentSchema = z.object({
   content: z.string().meta({
     example: '저희 집 몬스테라도 그랬는데 물 주기를 늘리니 좋아졌어요',
   }),
-  author: UserSummarySchema,
+  author: UserSummarySchema.nullable().meta({
+    description: '작성자 — **탈퇴한 유저의 댓글이면 null**(댓글은 남는다)',
+  }),
   mentionedUser: UserSummarySchema.nullable().meta({
     description:
       '답글이 지목한 유저("답글에 답글"의 구조화 멘션) — 루트 댓글·일반 답글이면 null. ' +

@@ -10,13 +10,16 @@ import { excludeBlocked } from '../../moderation/repository/block-filter';
 // 멘션된 유저 join용 별칭 — author(users)와 같은 테이블을 한 쿼리에서 두 번 조인한다.
 const mentionedUsers = alias(users, 'mentioned_users');
 
-// 작성자 요약 — inner join(author_id notNull + cascade라 항상 존재, post 전례).
+// 작성자 요약 — **left join**이다(author_id nullable + set null: 탈퇴해도 댓글은 남고
+// 작성자만 사라진다 — comment.table.ts). 미매칭 시 객체째 null(아래 멘션과 같은 결).
+// ⚠️ inner join으로 되돌리면 탈퇴 유저의 댓글이 목록에서 조용히 사라져 스레드에 구멍이
+// 뚫린다(replyCount는 users를 안 보므로 개수 불일치까지 생긴다). 방어선은 E2E뿐 — post 전례.
 const AUTHOR = { id: users.id, nickname: users.nickname };
 // 멘션 요약 — left join 미매칭(멘션 없음·멘션 유저 탈퇴로 set null) 시 객체째 null.
 const MENTIONED_USER = { id: mentionedUsers.id, nickname: mentionedUsers.nickname };
 
 // 살아있는 댓글의 content는 앱 불변식상 NOT NULL(NULL ⇔ soft-deleted —
-// comment.schema.ts doc)이라, deleted를 배제하는 프로젝션에서만 string으로 좁힌다.
+// comment.table.ts doc)이라, deleted를 배제하는 프로젝션에서만 string으로 좁힌다.
 const LIVE_CONTENT = sql<string>`${comments.content}`;
 
 // 단건 표현(POST 201·PATCH 200 재조회) — 답글 목록과 달리 parentId 포함
@@ -50,7 +53,7 @@ export class CommentReader {
     const [row] = await this.db
       .select(COMMENT_DETAIL_ROW)
       .from(comments)
-      .innerJoin(users, eq(comments.authorId, users.id))
+      .leftJoin(users, eq(comments.authorId, users.id))
       .leftJoin(mentionedUsers, eq(comments.mentionedUserId, mentionedUsers.id))
       .where(and(eq(comments.id, id), isNull(comments.deletedAt)));
     return row ?? null;
@@ -77,7 +80,7 @@ export class CommentReader {
         author: AUTHOR,
       })
       .from(comments)
-      .innerJoin(users, eq(comments.authorId, users.id))
+      .leftJoin(users, eq(comments.authorId, users.id))
       .where(
         and(
           eq(comments.postId, params.postId),
@@ -105,6 +108,9 @@ export class CommentReader {
   //    목록↔상세 간이라 덜 드러난다(그쪽은 드리프트를 수용하기로 한 결정).
   // ⚠️ index-only scan은 여기서 깨진다(차단 서브쿼리가 users_blocks를 추가로 탄다) —
   //    페이지당 1쿼리라 수용. 문제가 되면 그때 카운트를 비정규화 컬럼으로 옮긴다.
+  // 이 쿼리는 users를 조인하지 않는다 — 답글 목록이 left join이므로 두 쿼리의 대상 집합이
+  // 일치한다. (답글 목록이 inner join으로 되돌아가면 여기만 탈퇴 유저 답글을 계속 세서
+  // "답글 N개"와 실제 개수가 어긋난다 — 위 ②가 말한 같은 화면 안의 불일치가 된다.)
   async replyCounts(
     rootIds: string[],
     viewerId?: string,
@@ -147,7 +153,7 @@ export class CommentReader {
         mentionedUser: MENTIONED_USER,
       })
       .from(comments)
-      .innerJoin(users, eq(comments.authorId, users.id))
+      .leftJoin(users, eq(comments.authorId, users.id))
       .leftJoin(mentionedUsers, eq(comments.mentionedUserId, mentionedUsers.id))
       .where(
         and(

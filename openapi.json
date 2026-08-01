@@ -551,6 +551,808 @@
         "tags": [
           "User"
         ]
+      },
+      "delete": {
+        "operationId": "UserController_remove",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "회원탈퇴 — 계정을 즉시 하드 삭제한다(유예기간·복구 없음, 같은 소셜 계정으로 재가입 가능). ⚠️ **작성한 글은 댓글·좋아요와 함께 전부 삭제된다**(글 삭제 = 스레드 전체 소멸이라는 게시판 관례를 그대로 적용 — 타인이 그 글에 단 댓글도 사라진다). 세션·내 식물·물주기· 차단도 함께 소멸한다. 반면 **남의 글에 단 댓글은 남고 작성자 표시만 사라진다**(응답의 author: null) — 답글이 달린 스레드를 지키기 위함이다. 클라는 확인 다이얼로그에서 \"작성한 글이 모두 삭제된다\"를 반드시 고지해야 한다. 남은 access token은 만료까지 유효하지만 모든 쓰기가 401이 되고 GET /users/me는 404다"
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "statusCode",
+                    "errorCode",
+                    "message"
+                  ],
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "example": 401
+                    },
+                    "errorCode": {
+                      "type": "string",
+                      "enum": [
+                        "UNAUTHENTICATED"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "statusCode",
+                    "errorCode",
+                    "message"
+                  ],
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "example": 404
+                    },
+                    "errorCode": {
+                      "type": "string",
+                      "enum": [
+                        "USER_NOT_FOUND"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "User"
+        ]
+      }
+    },
+    "/posts": {
+      "post": {
+        "operationId": "PostController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePostDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "게시글 작성 — 본문 HTML은 서버 sanitize를 거쳐 저장된다. 응답 = GET /posts/:id와 같은 조회 표현",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostDetailDto_Output"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "statusCode",
+                    "errorCode",
+                    "message"
+                  ],
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "example": 401
+                    },
+                    "errorCode": {
+                      "type": "string",
+                      "enum": [
+                        "UNAUTHENTICATED"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "statusCode",
+                    "errorCode",
+                    "message"
+                  ],
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "example": 422
+                    },
+                    "errorCode": {
+                      "type": "string",
+                      "enum": [
+                        "INVALID_POST_TITLE",
+                        "INVALID_POST_CONTENT",
+                        "INVALID_POST_IMAGE_SRC",
+                        "POST_IMAGE_NOT_UPLOADED",
+                        "REFERENCED_PLANT_NOT_FOUND"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Post"
+        ]
+      },
+      "get": {
+        "operationId": "PostController_list",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "이전 페이지 마지막 글 id. 생략 시 첫 페이지. 삭제된 id여도 동작(존재 검사 없음)",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "페이지 크기 (1–50, 기본 20)",
+            "schema": {
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20,
+              "type": "integer"
+            }
+          },
+          {
+            "name": "plantId",
+            "required": false,
+            "in": "query",
+            "description": "이 카탈로그 식물이 태그된 글만",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "authorId",
+            "required": false,
+            "in": "query",
+            "description": "이 유저가 작성한 글만 (프로필 글 목록)",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "게시글 목록 — 최신순(id DESC) keyset 페이지네이션. plantId/authorId 필터 조합 가능. 인증 시 isLiked가 뷰어 기준으로 채워진다. 비로그인(Authorization 헤더 없음)이면 익명 열람 + isLiked 전부 false. ⚠️ 헤더를 보냈는데 토큰이 만료·손상됐으면 401이다 — 클라의 토큰 갱신 인터셉터가 이 공개 라우트도 커버해야 한다",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostListDto_Output"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "statusCode",
+                    "errorCode",
+                    "message"
+                  ],
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "example": 401
+                    },
+                    "errorCode": {
+                      "type": "string",
+                      "enum": [
+                        "UNAUTHENTICATED"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "",
+        "tags": [
+          "Post"
+        ]
+      }
+    },
+    "/posts/{id}": {
+      "get": {
+        "operationId": "PostController_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "게시글 id",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "게시글 상세 — 공개(비로그인 열람 가능). 인증 시 isLiked가 뷰어 기준으로 채워진다. 목록과 동일하게, 헤더를 보냈는데 토큰이 유효하지 않으면 401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostDetailDto_Output"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "statusCode",
+                    "errorCode",
+                    "message"
+                  ],
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "example": 401
+                    },
+                    "errorCode": {
+                      "type": "string",
+                      "enum": [
+                        "UNAUTHENTICATED"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "statusCode",
+                    "errorCode",
+                    "message"
+                  ],
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "example": 404
+                    },
+                    "errorCode": {
+                      "type": "string",
+                      "enum": [
+                        "POST_NOT_FOUND"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "",
+        "tags": [
+          "Post"
+        ]
+      },
+      "patch": {
+        "operationId": "PostController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "게시글 id",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePostDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "게시글 부분 수정 (JSON Merge Patch: 필드 부재 = 미변경, plantId null = 태그 해제). content 제공 시 재정화 + 파생(발췌·썸네일) 재계산. 타인 글은 404(존재 은닉). 응답 = 조회 표현",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostDetailDto_Output"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "statusCode",
+                    "errorCode",
+                    "message"
+                  ],
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "example": 401
+                    },
+                    "errorCode": {
+                      "type": "string",
+                      "enum": [
+                        "UNAUTHENTICATED"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "statusCode",
+                    "errorCode",
+                    "message"
+                  ],
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "example": 404
+                    },
+                    "errorCode": {
+                      "type": "string",
+                      "enum": [
+                        "POST_NOT_FOUND"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "statusCode",
+                    "errorCode",
+                    "message"
+                  ],
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "example": 422
+                    },
+                    "errorCode": {
+                      "type": "string",
+                      "enum": [
+                        "INVALID_POST_TITLE",
+                        "INVALID_POST_CONTENT",
+                        "INVALID_POST_IMAGE_SRC",
+                        "POST_IMAGE_NOT_UPLOADED",
+                        "REFERENCED_PLANT_NOT_FOUND"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Post"
+        ]
+      },
+      "delete": {
+        "operationId": "PostController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "게시글 id",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "게시글 삭제 (hard delete) — S3 이미지 객체는 지우지 않는다(sweep GC 몫, docs/todo.md). 타인 글은 404(존재 은닉)"
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "statusCode",
+                    "errorCode",
+                    "message"
+                  ],
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "example": 401
+                    },
+                    "errorCode": {
+                      "type": "string",
+                      "enum": [
+                        "UNAUTHENTICATED"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "statusCode",
+                    "errorCode",
+                    "message"
+                  ],
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "example": 404
+                    },
+                    "errorCode": {
+                      "type": "string",
+                      "enum": [
+                        "POST_NOT_FOUND"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Post"
+        ]
+      }
+    },
+    "/posts/{postId}/like": {
+      "put": {
+        "operationId": "PostLikeController_like",
+        "parameters": [
+          {
+            "name": "postId",
+            "required": true,
+            "in": "path",
+            "description": "게시글 id",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "좋아요 — 이미 좋아요한 글에 다시 보내도 동일 200(멱등, 카운터 불변 — 더블탭·재시도 안전). 비존재 글은 404. 응답의 likeCount는 요청 반영 후의 권위값",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostLikeDto_Output"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "statusCode",
+                    "errorCode",
+                    "message"
+                  ],
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "example": 401
+                    },
+                    "errorCode": {
+                      "type": "string",
+                      "enum": [
+                        "UNAUTHENTICATED"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "statusCode",
+                    "errorCode",
+                    "message"
+                  ],
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "example": 404
+                    },
+                    "errorCode": {
+                      "type": "string",
+                      "enum": [
+                        "POST_NOT_FOUND"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "PostLike"
+        ]
+      },
+      "delete": {
+        "operationId": "PostLikeController_unlike",
+        "parameters": [
+          {
+            "name": "postId",
+            "required": true,
+            "in": "path",
+            "description": "게시글 id",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "좋아요 취소 — 좋아요하지 않은 글에 보내도 동일 200(멱등, 카운터 불변). 비존재 글은 404. 204가 아닌 이유: 갱신된 likeCount를 실어 낙관적 UI가 경합으로 틀렸을 때 즉시 복구시킨다",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostLikeDto_Output"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "statusCode",
+                    "errorCode",
+                    "message"
+                  ],
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "example": 401
+                    },
+                    "errorCode": {
+                      "type": "string",
+                      "enum": [
+                        "UNAUTHENTICATED"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "statusCode",
+                    "errorCode",
+                    "message"
+                  ],
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "example": 404
+                    },
+                    "errorCode": {
+                      "type": "string",
+                      "enum": [
+                        "POST_NOT_FOUND"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "PostLike"
+        ]
       }
     },
     "/files": {
@@ -1770,731 +2572,6 @@
         ],
         "tags": [
           "Watering"
-        ]
-      }
-    },
-    "/posts": {
-      "post": {
-        "operationId": "PostController_create",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreatePostDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "게시글 작성 — 본문 HTML은 서버 sanitize를 거쳐 저장된다. 응답 = GET /posts/:id와 같은 조회 표현",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PostDetailDto_Output"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "required": [
-                    "statusCode",
-                    "errorCode",
-                    "message"
-                  ],
-                  "properties": {
-                    "statusCode": {
-                      "type": "number",
-                      "example": 401
-                    },
-                    "errorCode": {
-                      "type": "string",
-                      "enum": [
-                        "UNAUTHENTICATED"
-                      ]
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "required": [
-                    "statusCode",
-                    "errorCode",
-                    "message"
-                  ],
-                  "properties": {
-                    "statusCode": {
-                      "type": "number",
-                      "example": 422
-                    },
-                    "errorCode": {
-                      "type": "string",
-                      "enum": [
-                        "INVALID_POST_TITLE",
-                        "INVALID_POST_CONTENT",
-                        "INVALID_POST_IMAGE_SRC",
-                        "POST_IMAGE_NOT_UPLOADED",
-                        "REFERENCED_PLANT_NOT_FOUND"
-                      ]
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "tags": [
-          "Post"
-        ]
-      },
-      "get": {
-        "operationId": "PostController_list",
-        "parameters": [
-          {
-            "name": "cursor",
-            "required": false,
-            "in": "query",
-            "description": "이전 페이지 마지막 글 id. 생략 시 첫 페이지. 삭제된 id여도 동작(존재 검사 없음)",
-            "schema": {
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-              "type": "string"
-            }
-          },
-          {
-            "name": "limit",
-            "required": false,
-            "in": "query",
-            "description": "페이지 크기 (1–50, 기본 20)",
-            "schema": {
-              "minimum": 1,
-              "maximum": 50,
-              "default": 20,
-              "type": "integer"
-            }
-          },
-          {
-            "name": "plantId",
-            "required": false,
-            "in": "query",
-            "description": "이 카탈로그 식물이 태그된 글만",
-            "schema": {
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-              "type": "string"
-            }
-          },
-          {
-            "name": "authorId",
-            "required": false,
-            "in": "query",
-            "description": "이 유저가 작성한 글만 (프로필 글 목록)",
-            "schema": {
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "게시글 목록 — 최신순(id DESC) keyset 페이지네이션. plantId/authorId 필터 조합 가능. 인증 시 isLiked가 뷰어 기준으로 채워진다. 비로그인(Authorization 헤더 없음)이면 익명 열람 + isLiked 전부 false. ⚠️ 헤더를 보냈는데 토큰이 만료·손상됐으면 401이다 — 클라의 토큰 갱신 인터셉터가 이 공개 라우트도 커버해야 한다",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PostListDto_Output"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "required": [
-                    "statusCode",
-                    "errorCode",
-                    "message"
-                  ],
-                  "properties": {
-                    "statusCode": {
-                      "type": "number",
-                      "example": 401
-                    },
-                    "errorCode": {
-                      "type": "string",
-                      "enum": [
-                        "UNAUTHENTICATED"
-                      ]
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {},
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "",
-        "tags": [
-          "Post"
-        ]
-      }
-    },
-    "/posts/{id}": {
-      "get": {
-        "operationId": "PostController_detail",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "description": "게시글 id",
-            "schema": {
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "게시글 상세 — 공개(비로그인 열람 가능). 인증 시 isLiked가 뷰어 기준으로 채워진다. 목록과 동일하게, 헤더를 보냈는데 토큰이 유효하지 않으면 401",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PostDetailDto_Output"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "required": [
-                    "statusCode",
-                    "errorCode",
-                    "message"
-                  ],
-                  "properties": {
-                    "statusCode": {
-                      "type": "number",
-                      "example": 401
-                    },
-                    "errorCode": {
-                      "type": "string",
-                      "enum": [
-                        "UNAUTHENTICATED"
-                      ]
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "required": [
-                    "statusCode",
-                    "errorCode",
-                    "message"
-                  ],
-                  "properties": {
-                    "statusCode": {
-                      "type": "number",
-                      "example": 404
-                    },
-                    "errorCode": {
-                      "type": "string",
-                      "enum": [
-                        "POST_NOT_FOUND"
-                      ]
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {},
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "",
-        "tags": [
-          "Post"
-        ]
-      },
-      "patch": {
-        "operationId": "PostController_update",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "description": "게시글 id",
-            "schema": {
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdatePostDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "게시글 부분 수정 (JSON Merge Patch: 필드 부재 = 미변경, plantId null = 태그 해제). content 제공 시 재정화 + 파생(발췌·썸네일) 재계산. 타인 글은 404(존재 은닉). 응답 = 조회 표현",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PostDetailDto_Output"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "required": [
-                    "statusCode",
-                    "errorCode",
-                    "message"
-                  ],
-                  "properties": {
-                    "statusCode": {
-                      "type": "number",
-                      "example": 401
-                    },
-                    "errorCode": {
-                      "type": "string",
-                      "enum": [
-                        "UNAUTHENTICATED"
-                      ]
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "required": [
-                    "statusCode",
-                    "errorCode",
-                    "message"
-                  ],
-                  "properties": {
-                    "statusCode": {
-                      "type": "number",
-                      "example": 404
-                    },
-                    "errorCode": {
-                      "type": "string",
-                      "enum": [
-                        "POST_NOT_FOUND"
-                      ]
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "required": [
-                    "statusCode",
-                    "errorCode",
-                    "message"
-                  ],
-                  "properties": {
-                    "statusCode": {
-                      "type": "number",
-                      "example": 422
-                    },
-                    "errorCode": {
-                      "type": "string",
-                      "enum": [
-                        "INVALID_POST_TITLE",
-                        "INVALID_POST_CONTENT",
-                        "INVALID_POST_IMAGE_SRC",
-                        "POST_IMAGE_NOT_UPLOADED",
-                        "REFERENCED_PLANT_NOT_FOUND"
-                      ]
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "tags": [
-          "Post"
-        ]
-      },
-      "delete": {
-        "operationId": "PostController_remove",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "description": "게시글 id",
-            "schema": {
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "게시글 삭제 (hard delete) — S3 이미지 객체는 지우지 않는다(sweep GC 몫, docs/todo.md). 타인 글은 404(존재 은닉)"
-          },
-          "401": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "required": [
-                    "statusCode",
-                    "errorCode",
-                    "message"
-                  ],
-                  "properties": {
-                    "statusCode": {
-                      "type": "number",
-                      "example": 401
-                    },
-                    "errorCode": {
-                      "type": "string",
-                      "enum": [
-                        "UNAUTHENTICATED"
-                      ]
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "required": [
-                    "statusCode",
-                    "errorCode",
-                    "message"
-                  ],
-                  "properties": {
-                    "statusCode": {
-                      "type": "number",
-                      "example": 404
-                    },
-                    "errorCode": {
-                      "type": "string",
-                      "enum": [
-                        "POST_NOT_FOUND"
-                      ]
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "tags": [
-          "Post"
-        ]
-      }
-    },
-    "/posts/{postId}/like": {
-      "put": {
-        "operationId": "PostLikeController_like",
-        "parameters": [
-          {
-            "name": "postId",
-            "required": true,
-            "in": "path",
-            "description": "게시글 id",
-            "schema": {
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "좋아요 — 이미 좋아요한 글에 다시 보내도 동일 200(멱등, 카운터 불변 — 더블탭·재시도 안전). 비존재 글은 404. 응답의 likeCount는 요청 반영 후의 권위값",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PostLikeDto_Output"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "required": [
-                    "statusCode",
-                    "errorCode",
-                    "message"
-                  ],
-                  "properties": {
-                    "statusCode": {
-                      "type": "number",
-                      "example": 401
-                    },
-                    "errorCode": {
-                      "type": "string",
-                      "enum": [
-                        "UNAUTHENTICATED"
-                      ]
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "required": [
-                    "statusCode",
-                    "errorCode",
-                    "message"
-                  ],
-                  "properties": {
-                    "statusCode": {
-                      "type": "number",
-                      "example": 404
-                    },
-                    "errorCode": {
-                      "type": "string",
-                      "enum": [
-                        "POST_NOT_FOUND"
-                      ]
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "tags": [
-          "PostLike"
-        ]
-      },
-      "delete": {
-        "operationId": "PostLikeController_unlike",
-        "parameters": [
-          {
-            "name": "postId",
-            "required": true,
-            "in": "path",
-            "description": "게시글 id",
-            "schema": {
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "좋아요 취소 — 좋아요하지 않은 글에 보내도 동일 200(멱등, 카운터 불변). 비존재 글은 404. 204가 아닌 이유: 갱신된 likeCount를 실어 낙관적 UI가 경합으로 틀렸을 때 즉시 복구시킨다",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PostLikeDto_Output"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "required": [
-                    "statusCode",
-                    "errorCode",
-                    "message"
-                  ],
-                  "properties": {
-                    "statusCode": {
-                      "type": "number",
-                      "example": 401
-                    },
-                    "errorCode": {
-                      "type": "string",
-                      "enum": [
-                        "UNAUTHENTICATED"
-                      ]
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "required": [
-                    "statusCode",
-                    "errorCode",
-                    "message"
-                  ],
-                  "properties": {
-                    "statusCode": {
-                      "type": "number",
-                      "example": 404
-                    },
-                    "errorCode": {
-                      "type": "string",
-                      "enum": [
-                        "POST_NOT_FOUND"
-                      ]
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "tags": [
-          "PostLike"
         ]
       }
     },
@@ -3832,6 +3909,342 @@
           }
         }
       },
+      "CreatePostDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "example": "몬스테라 잎이 갈변해요"
+          },
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50000,
+            "description": "본문 HTML. 허용 태그: <p> <br> <strong> <s> <span class=\"color-*\"> <img src>. 글자색은 닫힌 팔레트 class만(color-gray · color-red · color-orange · color-yellow · color-green · color-blue · color-purple) — inline style은 제거된다. <img src>는 파일 업로드(POST /files, purpose=post-image)로 받은 key의 읽기 URL만 허용. 이미지 최대 20장. 그 외 태그·속성은 서버 sanitize가 제거하고, 위반(외부 이미지·빈 본문 등)은 422로 거부된다.",
+            "example": "<p>우리집 <strong>몬스테라</strong> 잎끝이 <span class=\"color-red\">갈색</span>으로 변해요</p>"
+          },
+          "plantId": {
+            "description": "카탈로그(plants) 식물 태그 — 특정 식물에 관한 글이 아니면 생략",
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "title",
+          "content"
+        ]
+      },
+      "PostDetailDto_Output": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "title": {
+            "type": "string",
+            "example": "몬스테라 잎이 갈변해요"
+          },
+          "excerpt": {
+            "type": "string",
+            "description": "본문 플레인텍스트 발췌(최대 200자, 목록 프리뷰용) — 이미지-only 글이면 빈 문자열"
+          },
+          "thumbnailUrl": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "첫 이미지 읽기 URL — 이미지 없는 글이면 null",
+            "example": "https://cdn.pulmung.com/post-image/018f2e6a.jpg"
+          },
+          "author": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "nickname": {
+                "type": "string",
+                "example": "식집사"
+              }
+            },
+            "required": [
+              "id",
+              "nickname"
+            ],
+            "additionalProperties": false
+          },
+          "plant": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "name": {
+                    "type": "string",
+                    "example": "몬스테라 알보"
+                  }
+                },
+                "required": [
+                  "id",
+                  "name"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "태그된 카탈로그 식물 — 무관한 글이면 null"
+          },
+          "commentCount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "살아있는 댓글 수(루트+답글) — 삭제(soft delete 포함) 즉시 감소"
+          },
+          "likeCount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "좋아요 수 — 뷰어와 무관한 전역 수치"
+          },
+          "isLiked": {
+            "type": "boolean",
+            "description": "이 응답을 받는 사람이 좋아요했는지 — 비로그인 열람이면 항상 false. 뷰어별 값이라 이 응답은 공유 캐시에 담기지 않는다(Cache-Control: private)"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "content": {
+            "type": "string",
+            "description": "sanitize를 통과해 저장된 본문 HTML — img src에 읽기 URL이 포함돼 있어 그대로 렌더 가능",
+            "example": "<p>우리집 <strong>몬스테라</strong> 잎끝이 <span class=\"color-red\">갈색</span>으로 변해요</p>"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "excerpt",
+          "thumbnailUrl",
+          "author",
+          "plant",
+          "commentCount",
+          "likeCount",
+          "isLiked",
+          "createdAt",
+          "content",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "PostListDto_Output": {
+        "type": "object",
+        "properties": {
+          "posts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "title": {
+                  "type": "string",
+                  "example": "몬스테라 잎이 갈변해요"
+                },
+                "excerpt": {
+                  "type": "string",
+                  "description": "본문 플레인텍스트 발췌(최대 200자, 목록 프리뷰용) — 이미지-only 글이면 빈 문자열"
+                },
+                "thumbnailUrl": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "첫 이미지 읽기 URL — 이미지 없는 글이면 null",
+                  "example": "https://cdn.pulmung.com/post-image/018f2e6a.jpg"
+                },
+                "author": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "nickname": {
+                      "type": "string",
+                      "example": "식집사"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "nickname"
+                  ],
+                  "additionalProperties": false
+                },
+                "plant": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "name": {
+                          "type": "string",
+                          "example": "몬스테라 알보"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "태그된 카탈로그 식물 — 무관한 글이면 null"
+                },
+                "commentCount": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991,
+                  "description": "살아있는 댓글 수(루트+답글) — 삭제(soft delete 포함) 즉시 감소"
+                },
+                "likeCount": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991,
+                  "description": "좋아요 수 — 뷰어와 무관한 전역 수치"
+                },
+                "isLiked": {
+                  "type": "boolean",
+                  "description": "이 응답을 받는 사람이 좋아요했는지 — 비로그인 열람이면 항상 false. 뷰어별 값이라 이 응답은 공유 캐시에 담기지 않는다(Cache-Control: private)"
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "excerpt",
+                "thumbnailUrl",
+                "author",
+                "plant",
+                "commentCount",
+                "likeCount",
+                "isLiked",
+                "createdAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "다음 페이지 cursor — null이면 마지막 페이지"
+          }
+        },
+        "required": [
+          "posts",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "UpdatePostDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50000
+          },
+          "plantId": {
+            "description": "식물 태그 — 값 = 교체, null = 태그 해제",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "PostLikeDto_Output": {
+        "type": "object",
+        "properties": {
+          "isLiked": {
+            "type": "boolean",
+            "description": "요청 후 내 좋아요 상태 — PUT이면 항상 true, DELETE면 항상 false"
+          },
+          "likeCount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "요청 후 이 글의 좋아요 수(권위값) — 멱등 요청(재좋아요·없는 좋아요 취소)이면 불변"
+          }
+        },
+        "required": [
+          "isLiked",
+          "likeCount"
+        ],
+        "additionalProperties": false
+      },
       "CreateFileUploadDto": {
         "type": "object",
         "properties": {
@@ -4717,342 +5130,6 @@
         ],
         "additionalProperties": false
       },
-      "CreatePostDto": {
-        "type": "object",
-        "properties": {
-          "title": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 200,
-            "example": "몬스테라 잎이 갈변해요"
-          },
-          "content": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 50000,
-            "description": "본문 HTML. 허용 태그: <p> <br> <strong> <s> <span class=\"color-*\"> <img src>. 글자색은 닫힌 팔레트 class만(color-gray · color-red · color-orange · color-yellow · color-green · color-blue · color-purple) — inline style은 제거된다. <img src>는 파일 업로드(POST /files, purpose=post-image)로 받은 key의 읽기 URL만 허용. 이미지 최대 20장. 그 외 태그·속성은 서버 sanitize가 제거하고, 위반(외부 이미지·빈 본문 등)은 422로 거부된다.",
-            "example": "<p>우리집 <strong>몬스테라</strong> 잎끝이 <span class=\"color-red\">갈색</span>으로 변해요</p>"
-          },
-          "plantId": {
-            "description": "카탈로그(plants) 식물 태그 — 특정 식물에 관한 글이 아니면 생략",
-            "type": "string",
-            "format": "uuid",
-            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-          }
-        },
-        "required": [
-          "title",
-          "content"
-        ]
-      },
-      "PostDetailDto_Output": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid",
-            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-          },
-          "title": {
-            "type": "string",
-            "example": "몬스테라 잎이 갈변해요"
-          },
-          "excerpt": {
-            "type": "string",
-            "description": "본문 플레인텍스트 발췌(최대 200자, 목록 프리뷰용) — 이미지-only 글이면 빈 문자열"
-          },
-          "thumbnailUrl": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "uri"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "첫 이미지 읽기 URL — 이미지 없는 글이면 null",
-            "example": "https://cdn.pulmung.com/post-image/018f2e6a.jpg"
-          },
-          "author": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "string",
-                "format": "uuid",
-                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-              },
-              "nickname": {
-                "type": "string",
-                "example": "식집사"
-              }
-            },
-            "required": [
-              "id",
-              "nickname"
-            ],
-            "additionalProperties": false
-          },
-          "plant": {
-            "anyOf": [
-              {
-                "type": "object",
-                "properties": {
-                  "id": {
-                    "type": "string",
-                    "format": "uuid",
-                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                  },
-                  "name": {
-                    "type": "string",
-                    "example": "몬스테라 알보"
-                  }
-                },
-                "required": [
-                  "id",
-                  "name"
-                ],
-                "additionalProperties": false
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "태그된 카탈로그 식물 — 무관한 글이면 null"
-          },
-          "commentCount": {
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 9007199254740991,
-            "description": "살아있는 댓글 수(루트+답글) — 삭제(soft delete 포함) 즉시 감소"
-          },
-          "likeCount": {
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 9007199254740991,
-            "description": "좋아요 수 — 뷰어와 무관한 전역 수치"
-          },
-          "isLiked": {
-            "type": "boolean",
-            "description": "이 응답을 받는 사람이 좋아요했는지 — 비로그인 열람이면 항상 false. 뷰어별 값이라 이 응답은 공유 캐시에 담기지 않는다(Cache-Control: private)"
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time",
-            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
-          },
-          "content": {
-            "type": "string",
-            "description": "sanitize를 통과해 저장된 본문 HTML — img src에 읽기 URL이 포함돼 있어 그대로 렌더 가능",
-            "example": "<p>우리집 <strong>몬스테라</strong> 잎끝이 <span class=\"color-red\">갈색</span>으로 변해요</p>"
-          },
-          "updatedAt": {
-            "type": "string",
-            "format": "date-time",
-            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
-          }
-        },
-        "required": [
-          "id",
-          "title",
-          "excerpt",
-          "thumbnailUrl",
-          "author",
-          "plant",
-          "commentCount",
-          "likeCount",
-          "isLiked",
-          "createdAt",
-          "content",
-          "updatedAt"
-        ],
-        "additionalProperties": false
-      },
-      "PostListDto_Output": {
-        "type": "object",
-        "properties": {
-          "posts": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string",
-                  "format": "uuid",
-                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                },
-                "title": {
-                  "type": "string",
-                  "example": "몬스테라 잎이 갈변해요"
-                },
-                "excerpt": {
-                  "type": "string",
-                  "description": "본문 플레인텍스트 발췌(최대 200자, 목록 프리뷰용) — 이미지-only 글이면 빈 문자열"
-                },
-                "thumbnailUrl": {
-                  "anyOf": [
-                    {
-                      "type": "string",
-                      "format": "uri"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ],
-                  "description": "첫 이미지 읽기 URL — 이미지 없는 글이면 null",
-                  "example": "https://cdn.pulmung.com/post-image/018f2e6a.jpg"
-                },
-                "author": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "string",
-                      "format": "uuid",
-                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                    },
-                    "nickname": {
-                      "type": "string",
-                      "example": "식집사"
-                    }
-                  },
-                  "required": [
-                    "id",
-                    "nickname"
-                  ],
-                  "additionalProperties": false
-                },
-                "plant": {
-                  "anyOf": [
-                    {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "string",
-                          "format": "uuid",
-                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                        },
-                        "name": {
-                          "type": "string",
-                          "example": "몬스테라 알보"
-                        }
-                      },
-                      "required": [
-                        "id",
-                        "name"
-                      ],
-                      "additionalProperties": false
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ],
-                  "description": "태그된 카탈로그 식물 — 무관한 글이면 null"
-                },
-                "commentCount": {
-                  "type": "integer",
-                  "minimum": 0,
-                  "maximum": 9007199254740991,
-                  "description": "살아있는 댓글 수(루트+답글) — 삭제(soft delete 포함) 즉시 감소"
-                },
-                "likeCount": {
-                  "type": "integer",
-                  "minimum": 0,
-                  "maximum": 9007199254740991,
-                  "description": "좋아요 수 — 뷰어와 무관한 전역 수치"
-                },
-                "isLiked": {
-                  "type": "boolean",
-                  "description": "이 응답을 받는 사람이 좋아요했는지 — 비로그인 열람이면 항상 false. 뷰어별 값이라 이 응답은 공유 캐시에 담기지 않는다(Cache-Control: private)"
-                },
-                "createdAt": {
-                  "type": "string",
-                  "format": "date-time",
-                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
-                }
-              },
-              "required": [
-                "id",
-                "title",
-                "excerpt",
-                "thumbnailUrl",
-                "author",
-                "plant",
-                "commentCount",
-                "likeCount",
-                "isLiked",
-                "createdAt"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "nextCursor": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "uuid",
-                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "다음 페이지 cursor — null이면 마지막 페이지"
-          }
-        },
-        "required": [
-          "posts",
-          "nextCursor"
-        ],
-        "additionalProperties": false
-      },
-      "UpdatePostDto": {
-        "type": "object",
-        "properties": {
-          "title": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 200
-          },
-          "content": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 50000
-          },
-          "plantId": {
-            "description": "식물 태그 — 값 = 교체, null = 태그 해제",
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "uuid",
-                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        }
-      },
-      "PostLikeDto_Output": {
-        "type": "object",
-        "properties": {
-          "isLiked": {
-            "type": "boolean",
-            "description": "요청 후 내 좋아요 상태 — PUT이면 항상 true, DELETE면 항상 false"
-          },
-          "likeCount": {
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 9007199254740991,
-            "description": "요청 후 이 글의 좋아요 수(권위값) — 멱등 요청(재좋아요·없는 좋아요 취소)이면 불변"
-          }
-        },
-        "required": [
-          "isLiked",
-          "likeCount"
-        ],
-        "additionalProperties": false
-      },
       "CreateCommentDto": {
         "type": "object",
         "properties": {
@@ -5094,23 +5171,31 @@
             "example": "저희 집 몬스테라도 그랬는데 물 주기를 늘리니 좋아졌어요"
           },
           "author": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "string",
-                "format": "uuid",
-                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "nickname": {
+                    "type": "string",
+                    "example": "식집사"
+                  }
+                },
+                "required": [
+                  "id",
+                  "nickname"
+                ],
+                "additionalProperties": false
               },
-              "nickname": {
-                "type": "string",
-                "example": "식집사"
+              {
+                "type": "null"
               }
-            },
-            "required": [
-              "id",
-              "nickname"
             ],
-            "additionalProperties": false
+            "description": "작성자 — **탈퇴한 유저의 댓글이면 null**(댓글은 남는다)"
           },
           "mentionedUser": {
             "anyOf": [
@@ -5185,23 +5270,31 @@
                       "example": "저희 집 몬스테라도 그랬는데 물 주기를 늘리니 좋아졌어요"
                     },
                     "author": {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "string",
-                          "format": "uuid",
-                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            "nickname": {
+                              "type": "string",
+                              "example": "식집사"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "nickname"
+                          ],
+                          "additionalProperties": false
                         },
-                        "nickname": {
-                          "type": "string",
-                          "example": "식집사"
+                        {
+                          "type": "null"
                         }
-                      },
-                      "required": [
-                        "id",
-                        "nickname"
                       ],
-                      "additionalProperties": false
+                      "description": "작성자 — **탈퇴한 유저의 댓글이면 null**(댓글은 남는다)"
                     },
                     "replyCount": {
                       "type": "integer",
@@ -5327,23 +5420,31 @@
                   "example": "맞아요, 과습이 원인일 때가 많더라고요"
                 },
                 "author": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "string",
-                      "format": "uuid",
-                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "nickname": {
+                          "type": "string",
+                          "example": "식집사"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "nickname"
+                      ],
+                      "additionalProperties": false
                     },
-                    "nickname": {
-                      "type": "string",
-                      "example": "식집사"
+                    {
+                      "type": "null"
                     }
-                  },
-                  "required": [
-                    "id",
-                    "nickname"
                   ],
-                  "additionalProperties": false
+                  "description": "작성자 — **탈퇴한 유저의 답글이면 null**(답글은 남는다)"
                 },
                 "mentionedUser": {
                   "anyOf": [

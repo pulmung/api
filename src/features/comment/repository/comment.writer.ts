@@ -166,6 +166,8 @@ export class CommentWriter {
 
   // 소유 + 살아있음 스코프 — 쓰기 계열 공통 WHERE. soft-deleted는 표적 연산에
   // 소멸한 리소스라(도메인 에러 doc) deleted_at IS NULL이 authorId와 함께 간다.
+  // ⚠️ 작성자가 탈퇴한 댓글(author_id IS NULL)은 이 술어에 **아무도** 걸리지 않는다
+  //    (`NULL = 'uuid'`는 NULL) → 수정·삭제 불가. 의도된 귀결 — comment.table.ts authorId doc.
   private ownedLive(id: string, authorId: string) {
     return and(
       eq(comments.id, id),

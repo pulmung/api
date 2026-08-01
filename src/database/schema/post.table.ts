@@ -41,7 +41,7 @@ export const FK_POSTS_PLANT = 'fk_posts_plant';
  * 의도적으로 없는 것 — 전부 도입 시점에 additive:
  * - 카테고리(게시판 구분): 요구가 생기면 닫힌 enum으로(§9 배포 트레인 기준).
  *
- * 재검토가 끝난 것(각 도메인 도입 시점 결정 — comment.schema.ts·post-like.schema.ts doc 참조):
+ * 재검토가 끝난 것(각 도메인 도입 시점 결정 — comment.table.ts·post-like.table.ts doc 참조):
  * - 댓글 카운터: commentCount로 비정규화(아래 컬럼).
  * - 좋아요 카운터: likeCount로 비정규화(아래 컬럼) — 목록 표시가 확정 수요라 commentCount와
  *   동일 계산. 라이브 COUNT는 목록 페이지마다 N회 집계라 비정규화의 관리 비용이 더 싸다.
@@ -54,11 +54,32 @@ export const posts = pgTable(
     id: uuid()
       .primaryKey()
       .$defaultFn(() => uuidv7()),
-    // 탈퇴 = 글도 소멸(cascade) — user_plants 전례·최소수집 기조와 일치. 끊긴 이미지
-    // 참조는 월간 sweep GC가 청소한다(docs/todo.md — 별도 enqueue 불필요).
+    // 탈퇴 = 글도 소멸(cascade) — 그 글의 댓글·좋아요도 함께 사라진다.
+    //
+    // **왜 comments.authorId(set null, 보존)와 갈리나** — 두 테이블의 *기존* 삭제 정책을
+    // 각자 그대로 따른 결과다. 위 doc이 이미 결정했듯 **글 삭제 = 스레드 전체 소멸**이
+    // 게시판 관례다(유저가 자기 글을 직접 지우면 남의 댓글도 통째로 사라진다). 그렇다면
+    // "글 100개를 하나씩 지우고 탈퇴"와 "그냥 탈퇴"의 결과가 달라질 이유가 없다.
+    // 반면 댓글 삭제는 삼분기라 "답글이 있으면 자리를 지킨다"가 그 테이블의 규율이고,
+    // 그래서 댓글만 set null로 남는다. 즉 이 비대칭은 절충이 아니라 **일관성**이다.
+    // (2026-07 재검토: 한때 이 컬럼도 set null이었다. "타인의 대화 맥락 보존"을 근거로
+    //  들었으나, 그 원칙은 글 레벨에서 이 레포가 이미 포기한 것이라 탈퇴에만 되살릴
+    //  근거가 없었다. 되돌리면서 아래 셋을 함께 얻었다: 수정·삭제 불가한 유령 글이
+    //  안 생긴다 · 이미지 참조가 끊겨 sweep GC가 청소한다(프라이버시) · 읽기 경로가
+    //  inner join으로 남아 응답 계약이 단순하다.)
+    //
+    // 트레이드오프로 포기한 것: 정보성 글의 축적 자산·SEO(탈퇴로 사라진다). 유저가 직접
+    // 지워도 어차피 사라지므로 탈퇴자의 글만 붙잡아둘 근거가 되지 못한다고 판단했다.
+    // **재검토 트리거**: 지식 축적이 서비스의 핵심 자산이 되어 "탈퇴해도 본문은 남긴다"가
+    // 약관·정책으로 요구될 때(Stack Overflow의 CC 라이선스 모델).
+    //
+    // 끊긴 이미지 참조는 월간 sweep GC가 청소한다(docs/todo.md — 별도 enqueue 불필요).
     authorId: uuid()
       .notNull()
-      .references(() => users.id, { name: FK_POSTS_AUTHOR, onDelete: 'cascade' }),
+      .references(() => users.id, {
+        name: FK_POSTS_AUTHOR,
+        onDelete: 'cascade',
+      }),
 
     // 카탈로그 종 태그 — "이 글이 다루는 식물". 질문/탐색의 주제 축: 종 맥락 제공,
     // "이 식물의 글" 목록, 식물 상세의 관련 글 섹션. 옵셔널 — 특정 식물에 관한 글이
@@ -97,7 +118,9 @@ export const posts = pgTable(
 
     // 좋아요 수 — 목록 표시용 비정규화(commentCount와 같은 결). 증감은 좋아요 쓰기
     // 어댑터가 post_likes INSERT/DELETE와 같은 트랜잭션에서 수행하며, 그때 updatedAt
-    // 자기대입으로 $onUpdate를 억제한다(좋아요 활동 ≠ 글 수정). post-like.schema.ts doc 참조.
+    // 자기대입으로 $onUpdate를 억제한다(좋아요 활동 ≠ 글 수정). post-like.table.ts doc 참조.
+    // 계정 삭제 경로도 같은 규율을 따른다 — post_likes cascade에 맡기면 어댑터를 우회해
+    // 드리프트하므로, DeleteUserUseCase가 좋아요를 명시적으로 지우며 여기를 일괄 감소시킨다.
     likeCount: integer().notNull().default(0),
 
     createdAt: timestamp({ withTimezone: true }).defaultNow().notNull(),

@@ -20,6 +20,8 @@ const POST_LIST_ROW = {
   likeCount: posts.likeCount,
   createdAt: posts.createdAt,
   // 작성자 요약 — inner join(author_id notNull + onDelete cascade라 항상 존재).
+  // 탈퇴하면 글 자체가 사라지므로 "작성자 없는 글"이 존재하지 않는다 — 댓글과 갈리는
+  // 지점이다(comment.reader의 AUTHOR는 left join). 근거는 post.table.ts authorId doc.
   author: { id: users.id, nickname: users.nickname },
   // 식물 태그 요약 — left join 미매칭 시 drizzle이 객체째 null로 접는다(user-plant 전례).
   plant: { id: plants.id, name: plants.name },

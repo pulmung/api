@@ -30,6 +30,12 @@ import { userBlocks } from '../../../database/schema';
  *   (drizzle의 and가 undefined를 건너뛴다 — `cursor ? gt(...) : undefined` 관례와 동일).
  * @param authorId 필터 대상 행의 작성자 컬럼(`posts.authorId`·`comments.authorId` 등).
  *   컬럼 참조로 받으므로 상관 서브쿼리가 각 행마다 평가된다.
+ *   **NULL-safe다**(= 작성자가 탈퇴한 행). `blocked_id = NULL`이 UNKNOWN이라 서브쿼리가
+ *   0행을 내고 `NOT EXISTS(empty)`는 TRUE → 두 항 모두 통과해 행이 살아남는다. 이게
+ *   의도다 — 차단은 사람 대 사람 관계인데 상대가 존재하지 않으므로 가릴 것이 없다.
+ *   ⚠️ 이 성질은 anti-join 형태에서만 성립한다. `NOT IN (서브쿼리)`로 "단순화"하면
+ *   서브쿼리가 NULL을 하나라도 내는 순간 전체가 UNKNOWN이 되어 **모든 행이 사라진다**.
+ *   위 "왜 NOT EXISTS 두 개인가"는 인덱스 때문에 고른 형태지만 이 안전성을 함께 준다.
  */
 export function excludeBlocked(
   db: DrizzleDB,

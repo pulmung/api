@@ -32,7 +32,11 @@ const RootCommentItemSchema = z.discriminatedUnion('deleted', [
     content: z.string().meta({
       example: '저희 집 몬스테라도 그랬는데 물 주기를 늘리니 좋아졌어요',
     }),
-    author: UserSummarySchema,
+    // 탈퇴 유저의 댓글이면 null — deleted(본문 유무)와 직교하는 축이라 union 브랜치를
+    // 늘리지 않고 nullable로 둔다(comment-query.service.ts doc).
+    author: UserSummarySchema.nullable().meta({
+      description: '작성자 — **탈퇴한 유저의 댓글이면 null**(댓글은 남는다)',
+    }),
     replyCount: replyCountField,
     createdAt: z.iso.datetime(),
     updatedAt: z.iso.datetime(),

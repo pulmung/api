@@ -38,7 +38,8 @@ export class ReportWriter {
     reporterId: string;
     targetType: ReportTargetType;
     targetId: string;
-    targetAuthorId: string;
+    // null = 접수 시점에 대상 작성자가 이미 탈퇴(report.table.ts 컬럼 doc).
+    targetAuthorId: string | null;
     reason: ReportReason;
     detail?: string;
   }): Promise<{ id: string; createdAt: Date }> {

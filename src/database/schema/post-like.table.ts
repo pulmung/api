@@ -27,8 +27,17 @@ export const PK_POST_LIKES = 'pk_post_likes';
  * posts.likeCount 비정규화 — 증감은 좋아요 쓰기 어댑터가 INSERT/DELETE와 같은
  * 트랜잭션에서 수행(comment.writer.ts의 commentCount와 동일 규율 — updatedAt
  * 자기대입으로 $onUpdate 억제. 멱등 경로에선 실제 삽입/삭제된 행 수만큼만 증감).
- * ⚠️ 회원탈퇴 유예: users cascade는 쓰기 어댑터를 우회하므로 likeCount가 드리프트한다
- * (comment.schema.ts 유예 ②와 같은 결 — 탈퇴 feature가 오케스트레이션으로 풀 것).
+ * 회원탈퇴 유예 → **해소**: `DeleteUserUseCase`가 users를 지우기 **전에**
+ * `PostLikeWriter.deleteAllByUser()`로 이 유저의 좋아요를 명시적으로 지우고, 그 반환값
+ * (지워진 행의 postId 집합)으로 `PostWriter.adjustLikeCounts(ids, -1)`을 호출한다.
+ * 드리프트가 실제로 문제되는 건 **남의 글에 누른 좋아요**뿐이다 — 자기 글에 달린 좋아요는
+ * 그 글이 cascade로 사라지면서 카운터를 든 행도 함께 없어진다. 명시 삭제는 두 경우를
+ * 구분하지 않는다(구분해봐야 쿼리만 늘고, 곧 지워질 글의 카운터를 갱신하는 건 무해하다).
+ *
+ * ⚠️ 그런데도 아래 userId FK는 **cascade를 유지한다** — 백스톱이다. NO ACTION으로 바꾸면
+ * 유스케이스가 좋아요를 지운 뒤 users를 지우기 전 찰나에 본인의 다른 기기가 좋아요를
+ * 커밋했을 때 카운터 1 드리프트로 끝날 일이 **트랜잭션 실패(500)** 가 된다. 그 레이스는
+ * 수용하기로 한 것이라(delete-user.usecase.ts doc) 실패로 승격시키지 않는다.
  */
 export const postLikes = pgTable(
   'post_likes',
@@ -54,9 +63,10 @@ export const postLikes = pgTable(
     // (post_id, user_id) — ① 중복 좋아요 방지(멱등의 근거) ② "내가 이 글에 좋아요
     // 했는지" 점조회 ③ posts cascade 삭제의 자식 행 스캔(leftmost prefix)을 겸한다.
     primaryKey({ name: PK_POST_LIKES, columns: [t.postId, t.userId] }),
-    // (user_id, post_id) — ① users cascade 삭제의 자식 행 스캔(PK는 post_id 선두라
-    // 못 탄다) ② 목록의 "내가 좋아요 했는지" 배치 확인(WHERE user_id = ? AND
-    // post_id IN (…))을 index-only로 ③ 미래 "내가 좋아요한 글" 목록(idx_comments_author 전례).
+    // (user_id, post_id) — ① 계정 삭제의 `DELETE … WHERE user_id = ?`(+ cascade 백스톱의
+    // 자식 행 스캔. PK는 post_id 선두라 못 탄다) ② 목록의 "내가 좋아요 했는지" 배치
+    // 확인(WHERE user_id = ? AND post_id IN (…))을 index-only로 ③ 미래 "내가 좋아요한
+    // 글" 목록(idx_comments_author 전례).
     index('idx_post_likes_user').on(t.userId, t.postId),
   ],
 );

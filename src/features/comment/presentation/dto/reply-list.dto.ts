@@ -7,7 +7,9 @@ import { UserSummarySchema } from '../../../user/presentation/shared/user-summar
 const ReplyItemSchema = z.object({
   id: z.uuid(),
   content: z.string().meta({ example: '맞아요, 과습이 원인일 때가 많더라고요' }),
-  author: UserSummarySchema,
+  author: UserSummarySchema.nullable().meta({
+    description: '작성자 — **탈퇴한 유저의 답글이면 null**(답글은 남는다)',
+  }),
   mentionedUser: UserSummarySchema.nullable().meta({
     description: '지목된 유저("답글에 답글" 멘션) — 일반 답글이면 null',
   }),

@@ -37,12 +37,14 @@ export class CreateReportUseCase {
   }): Promise<{ id: string; createdAt: Date }> {
     // FK가 없어 23503을 잡을 수 없으므로 사전 조회다 — 다만 targetAuthorId를 어차피
     // 여기서 얻어야 하니 추가 쿼리가 아니다(ReportTargetReader doc).
-    const targetAuthorId = await this.targetReader.findAuthorId(
+    const target = await this.targetReader.findTargetMeta(
       command.targetType,
       command.targetId,
     );
-    if (!targetAuthorId) throw new ReportTargetNotFoundError();
+    // 대상 자체가 없을 때만 404다. 대상은 있는데 작성자가 탈퇴한 경우(target.authorId ===
+    // null)는 접수한다 — 콘텐츠가 남아 있는 이상 신고 경로가 막히면 안 된다(report.table.ts).
+    if (!target) throw new ReportTargetNotFoundError();
 
-    return this.writer.insert({ ...command, targetAuthorId });
+    return this.writer.insert({ ...command, targetAuthorId: target.authorId });
   }
 }

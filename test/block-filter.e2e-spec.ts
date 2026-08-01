@@ -257,4 +257,78 @@ describe('BlockFilter (e2e) — 차단이 목록 읽기에서 양방향으로 �
       expect(replyIds(body)).toEqual([]);
     });
   });
+
+  /**
+   * `excludeBlocked`는 anti-join(NOT EXISTS 2개)이라 `author_id IS NULL`에 NULL-safe다 —
+   * 등호가 UNKNOWN → 서브쿼리 0행 → NOT EXISTS TRUE → 행 통과.
+   * 누군가 이걸 `NOT IN (서브쿼리)`로 "단순화"하면 NULL 하나가 전체를 UNKNOWN으로
+   * 만들어 **목록이 통째로 비는데**, 그 회귀를 잡는 건 이 describe뿐이다.
+   */
+  describe('작성자 탈퇴(author_id NULL)는 차단 필터를 통과한다', () => {
+    const ROOT_C = '00000000-0000-7000-8000-0000000000c1';
+    const REPLY_C = '00000000-0000-7000-8000-0000000000c2';
+
+    // 전용 유저 캐롤을 만들고 → 앨리스가 차단 → **남의 글(POST_A)에** 댓글을 남기고 → 탈퇴.
+    // 공유 픽스처(보브)를 지우면 바깥 beforeEach의 POST_B 삽입이 FK로 깨져 파일 전체가
+    // 실행 순서에 의존하게 된다(report 스펙이 세운 규율).
+    // 글이 아니라 댓글로 검증하는 이유: 탈퇴하면 자기 글은 cascade로 사라져 author_id NULL인
+    // 글이 존재할 수 없다. 이 상태는 남의 글에 단 댓글에서만 생긴다(post.table.ts).
+    beforeEach(async () => {
+      // 앨리스→보브 차단을 함께 걸어 **필터가 실제로 켜진 상태**임을 보장한다 —
+      // 필터가 통째로 죽어도 통과하는 테스트가 되면 안 되므로.
+      await aliceBlocksBob();
+
+      const res = await request(server).post('/auth/signup').send({
+        provider: 'kakao',
+        platform: 'ios',
+        accessToken: 'filter-carol',
+        nickname: '캐롤',
+      });
+      expect(res.status).toBe(201);
+      const [carol] = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.nickname, '캐롤'));
+
+      await db
+        .insert(userBlocks)
+        .values({ blockerId: aliceId, blockedId: carol.id });
+      await db.insert(comments).values({
+        id: ROOT_C,
+        postId: POST_A,
+        authorId: carol.id,
+        content: '캐롤 루트',
+      });
+      await db.insert(comments).values({
+        id: REPLY_C,
+        postId: POST_A,
+        parentId: ROOT_A,
+        authorId: carol.id,
+        content: '캐롤 답글',
+      });
+
+      // 탈퇴 — 두 댓글의 author_id가 NULL이 되고, 앨리스→캐롤 차단 행은 cascade로 사라진다.
+      await db.delete(users).where(eq(users.id, carol.id));
+    });
+
+    it('차단했던 상대가 탈퇴하면 그가 남긴 루트·답글이 다시 보인다', async () => {
+      const roots = await get(`/posts/${POST_A}/comments`, aliceToken);
+      expect(commentIds(roots.body)).toContain(ROOT_C);
+      // 살아있는 차단(앨리스→보브)은 그대로 걸린다 — 필터가 켜져 있다는 증거.
+      expect(commentIds(roots.body)).not.toContain(ROOT_B);
+
+      const replies = await get(`/comments/${ROOT_A}/replies`, aliceToken);
+      expect(replyIds(replies.body)).toContain(REPLY_C);
+      expect(replyIds(replies.body)).not.toContain(REPLY_B);
+    });
+
+    it('replyCount도 탈퇴자의 답글을 센다(목록과 같은 집합)', async () => {
+      const roots = await get(`/posts/${POST_A}/comments`, aliceToken);
+      const root = (roots.body as CommentListBody).comments.find(
+        (c) => c.id === ROOT_A,
+      )!;
+      // 앨리스 답글 + 캐롤(탈퇴) 답글 = 2. 보브 답글은 차단으로 빠진다.
+      expect(root.replyCount).toBe(2);
+    });
+  });
 });

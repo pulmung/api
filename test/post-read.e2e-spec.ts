@@ -216,4 +216,8 @@ describe('PostRead (e2e) — 공개 게시판 읽기', () => {
       expect(status).toBe(400);
     });
   });
+
+  // 작성자 탈퇴 케이스는 여기 없다 — 글이 cascade로 함께 사라져 "작성자 없는 글"이라는
+  // 상태가 존재하지 않기 때문이다(post.table.ts authorId doc). 탈퇴 전파 검증은
+  // test/user-deletion.e2e-spec.ts에 있다. 댓글은 반대로 남으므로 comment-read 쪽엔 있다.
 });

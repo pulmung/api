@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DatabaseError } from 'pg';
-import { and, DrizzleQueryError, eq, sql } from 'drizzle-orm';
+import { and, DrizzleQueryError, eq, inArray, sql } from 'drizzle-orm';
 import { TransactionHost } from '@nestjs-cls/transactional';
 import type { DrizzleDB } from '../../../database/drizzle.constants';
 import type { DrizzleTransactionalAdapter } from '../../../database/drizzle-transactional.adapter';
@@ -48,7 +48,13 @@ export class PostWriter {
     }
   }
 
-  /** @returns false = 비존재 또는 타인 글 (구분하지 않는다 — 존재 은닉) */
+  /**
+   * @returns false = 비존재 또는 타인 글 (구분하지 않는다 — 존재 은닉)
+   *
+   * ⚠️ 작성자가 탈퇴한 글(author_id IS NULL)은 **아무도 수정할 수 없다** — 아래 술어의
+   *    `NULL = 'uuid'`가 NULL이라 어떤 요청자로도 매칭되지 않는다. 의도된 귀결이며
+   *    근거·운영 경로는 post.table.ts의 authorId doc 참조.
+   */
   async update(
     id: string,
     authorId: string,
@@ -81,7 +87,11 @@ export class PostWriter {
     }
   }
 
-  /** @returns false = 비존재 또는 타인 글. S3 객체는 안 지운다(sweep GC 몫 — docs/todo.md) */
+  /**
+   * @returns false = 비존재 또는 타인 글. S3 객체는 안 지운다(sweep GC 몫 — docs/todo.md)
+   *
+   * ⚠️ update와 같은 이유로 작성자가 탈퇴한 글은 이 경로로 삭제되지 않는다(운영자 SQL 몫).
+   */
   async delete(id: string, authorId: string): Promise<boolean> {
     const rows = await this.db
       .delete(posts)
@@ -111,6 +121,29 @@ export class PostWriter {
       .where(eq(posts.id, postId))
       .returning({ likeCount: posts.likeCount });
     return row?.likeCount ?? null;
+  }
+
+  /**
+   * adjustLikeCount의 배치판 — 계정 삭제가 유저의 좋아요를 한 번에 걷어낼 때 쓴다.
+   * 카운터 규율은 동일(SQL 식 증감 + updatedAt 자기대입).
+   *
+   * 단건과 달리 RETURNING이 없다 — 배치엔 "그 글이 없다"의 404 의미가 없기 때문이다.
+   * 인자로 오는 id들은 방금 지운 좋아요 행이 가리키던 글이라 존재가 구성으로 보장된다.
+   *
+   * ⚠️ inArray는 빈 배열에서 유효한 SQL을 만들지 못한다 — 좋아요 0개인 유저의 탈퇴가
+   *    정상 경로이므로 호출자에 조건문을 심지 않고 여기서 거른다.
+   * ⚠️ postIds가 Postgres bind 파라미터 상한(65535)에 근접하면 이 문장이 실패한다.
+   *    현 규모에선 도달 불가 — 도달하면 `= any($1::uuid[])`(파라미터 1개)로 바꾼다.
+   */
+  async adjustLikeCounts(postIds: string[], delta: 1 | -1): Promise<void> {
+    if (postIds.length === 0) return;
+    await this.db
+      .update(posts)
+      .set({
+        likeCount: sql`${posts.likeCount} + ${delta}`,
+        updatedAt: sql`${posts.updatedAt}`,
+      })
+      .where(inArray(posts.id, postIds));
   }
 
   /** adjustLikeCount와 같은 규율 — 댓글 쓰기와 같은 트랜잭션에서 호출된다. */

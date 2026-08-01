@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import request from 'supertest';
 import { INestApplication } from '@nestjs/common';
 import { StartedPostgreSqlContainer } from '@testcontainers/postgresql';
+import { eq } from 'drizzle-orm';
 import { Server } from 'node:http';
 import { Pool } from 'pg';
 import { DrizzleDB } from '../src/database/drizzle.constants';
@@ -328,6 +329,80 @@ describe('CommentRead (e2e) — 공개 댓글 읽기', () => {
       expect((body as Record<string, unknown>).errorCode).toBe(
         'COMMENT_NOT_FOUND',
       );
+    });
+  });
+
+  // comment.reader의 users join이 leftJoin이라는 것의 **유일한 방어선**(post-read 전례).
+  // innerJoin으로 되돌리면 탈퇴 유저의 댓글이 조용히 사라져 스레드에 구멍이 뚫리고,
+  // replyCounts는 users를 안 보므로 "답글 N개"와 실제 개수까지 어긋난다.
+  describe('작성자 탈퇴 — 댓글은 남고 author만 null', () => {
+    // 전용 유저(지워야 하므로 공유 픽스처 사용 불가) — 가입 후 id를 준다.
+    const signupTemp = async (nickname: string) => {
+      await request(server).post('/auth/signup').send({
+        provider: 'kakao',
+        platform: 'ios',
+        accessToken: `comment-read-${nickname}`,
+        nickname,
+      });
+      const [row] = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.nickname, nickname));
+      return row.id;
+    };
+
+    it('루트 목록: 댓글이 남고 deleted:false + author null', async () => {
+      const quitterId = await signupTemp('탈퇴루트');
+      await insertComment({ id: commentId(1), authorId: quitterId });
+      await db.delete(users).where(eq(users.id, quitterId));
+
+      const { body } = await getRoots();
+      // 존재를 먼저 — 사라졌을 때 원인이 읽히도록(post-read와 같은 규율).
+      expect(body.comments.map((c) => c.id)).toContain(commentId(1));
+      expect(body.comments[0].deleted).toBe(false);
+      expect(body.comments[0].author).toBeNull();
+      expect(body.comments[0].content).toBe('댓글');
+    });
+
+    it('답글 목록: 답글이 남고 author null + replyCount와 실제 개수가 일치한다', async () => {
+      const quitterId = await signupTemp('탈퇴답글');
+      await insertComment({ id: commentId(2) }); // 루트는 살아있는 유저(댓글러A)
+      await insertComment({
+        id: commentId(12),
+        parentId: commentId(2),
+        authorId: quitterId,
+      });
+      await db.delete(users).where(eq(users.id, quitterId));
+
+      const roots = await getRoots();
+      const root = roots.body.comments.find((c) => c.id === commentId(2))!;
+      // 목록(leftJoin)과 카운트(users 미조인)가 같은 집합을 봐야 한다 — 한쪽만
+      // innerJoin이면 여기서 1 ≠ 0으로 갈린다.
+      expect(root.replyCount).toBe(1);
+
+      const replies = await getReplies(commentId(2));
+      expect(replies.body.replies.map((r) => r.id)).toEqual([commentId(12)]);
+      expect(replies.body.replies[0].author).toBeNull();
+    });
+
+    it('멘션된 유저가 탈퇴하면 mentionedUser만 null이 된다(답글 본문은 남는다)', async () => {
+      const mentionedId = await signupTemp('탈퇴멘션');
+      await insertComment({ id: commentId(3) });
+      await insertComment({
+        id: commentId(13),
+        parentId: commentId(3),
+        mentionedUserId: mentionedId,
+      });
+      await db.delete(users).where(eq(users.id, mentionedId));
+
+      const { body } = await getReplies(commentId(3));
+      expect(body.replies.map((r) => r.id)).toEqual([commentId(13)]);
+      expect(body.replies[0].mentionedUser).toBeNull();
+      // 멘션 유저는 남이므로 작성자(댓글러A)는 그대로다 — 두 축이 독립임을 고정한다.
+      expect(body.replies[0].author).toEqual({
+        id: userAId,
+        nickname: '댓글러A',
+      });
     });
   });
 });

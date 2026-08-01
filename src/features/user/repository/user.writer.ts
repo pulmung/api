@@ -81,4 +81,19 @@ export class UserWriter {
       throw e;
     }
   }
+
+  /**
+   * 계정 삭제(회원탈퇴) — 이 행의 하드 삭제. 참조 테이블로의 전파는 FK가 하고, 그중
+   * 앱이 먼저 처리해야 하는 것(카운터를 드리프트시키는 post_likes)은 유스케이스가
+   * **이 호출 전에** 끝낸다. 전파 맵 전체는 user.table.ts doc 참조.
+   *
+   * @returns false = 비존재 (무상태 JWT sub가 가리키는 행이 이미 사라진 경우 — update와 동일)
+   */
+  async delete(id: string): Promise<boolean> {
+    const rows = await this.db
+      .delete(users)
+      .where(eq(users.id, id))
+      .returning({ id: users.id });
+    return rows.length > 0;
+  }
 }

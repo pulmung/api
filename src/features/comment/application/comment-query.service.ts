@@ -12,7 +12,10 @@ export type CommentDetail = {
   // null = 루트, 값 = 답글의 루트 id — URL 컨텍스트 없는 단건 응답이 스스로 말한다.
   parentId: string | null;
   content: string;
-  author: UserSummary;
+  // null = 작성자 탈퇴(comment.table.ts authorId set null). deleted와는 **직교하는 축**이라
+  // union 브랜치를 늘리지 않고 nullable로 둔다 — deleted는 "본문이 있나", 이건 "작성자가
+  // 있나"다. 둘을 union으로 곱하면 브랜치가 늘고 클라 분기가 하나 더 생긴다.
+  author: UserSummary | null;
   mentionedUser: UserSummary | null;
   createdAt: string;
   updatedAt: string;
@@ -25,7 +28,8 @@ export type RootCommentItem =
       deleted: false;
       id: string;
       content: string;
-      author: UserSummary;
+      // null = 작성자 탈퇴 — 위 CommentDetail.author와 같은 이유로 nullable(브랜치 X).
+      author: UserSummary | null;
       replyCount: number;
       createdAt: string;
       updatedAt: string;
@@ -47,7 +51,8 @@ export type RootCommentPage = {
 export type ReplyItem = {
   id: string;
   content: string;
-  author: UserSummary;
+  // null = 작성자 탈퇴 — mentionedUser와 같은 형태가 됐다(둘 다 users set null의 결과).
+  author: UserSummary | null;
   mentionedUser: UserSummary | null;
   createdAt: string;
   updatedAt: string;
@@ -138,7 +143,7 @@ export class CommentQueryService {
       deletedAt: Date | null;
       createdAt: Date;
       updatedAt: Date;
-      author: UserSummary;
+      author: UserSummary | null;
     },
     replyCount: number,
   ): RootCommentItem {
@@ -155,6 +160,9 @@ export class CommentQueryService {
       // content NULL ⇔ soft-deleted 불변식 위반 — 빈 문자열로 가리지 않고 500이 정직하다.
       throw new Error(`live comment without content: ${row.id}`);
     }
+    // ⚠️ author에는 대칭 가드를 두지 않는다 — 의도된 비대칭이다. content NULL은 불변식
+    // 위반이지만 author NULL은 **합법 상태**(작성자 탈퇴)라 던지면 탈퇴 유저가 남긴 댓글이
+    // 들어간 페이지 전체가 500이 된다.
     return {
       deleted: false,
       id: row.id,

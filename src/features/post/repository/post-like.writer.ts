@@ -65,6 +65,28 @@ export class PostLikeWriter {
     return deleted.length > 0;
   }
 
+  /**
+   * 이 유저의 좋아요 전부 삭제 — 계정 삭제 오케스트레이션 전용.
+   * `idx_post_likes_user (user_id, post_id)`가 그대로 커버한다.
+   *
+   * **반환이 계약이다**: 지워진 행의 postId 목록이 곧 "likeCount를 1씩 내려야 하는 글"의
+   * 집합이다. 여기서 카운터를 만지지 않는 이유는 소유권 — post_likes는 이 어댑터가,
+   * posts.likeCount는 PostWriter가 소유한다(§7-1). 호출자가 이 반환값을
+   * `PostWriter.adjustLikeCounts(ids, -1)`에 넘겨야 카운터가 맞는다.
+   *
+   * 복합 PK(pk_post_likes)가 (post_id, user_id) 유니크를 보장하므로 한 postId는 최대 1번
+   * 나온다 → 델타는 항상 정확히 -1이다(중복 감소가 구조적으로 불가능).
+   *
+   * FK 변환 없음 — delete는 RI 검사를 태우지 않는다(위 delete()와 같은 비대칭).
+   */
+  async deleteAllByUser(userId: string): Promise<string[]> {
+    const deleted = await this.db
+      .delete(postLikes)
+      .where(eq(postLikes.userId, userId))
+      .returning({ postId: postLikes.postId });
+    return deleted.map((row) => row.postId);
+  }
+
   // FK 위반(23503)을 도메인 예외로 변환 — 사전 SELECT 없음(post.writer와 같은 경로).
   private throwIfFkViolation(e: unknown): void {
     const cause = e instanceof DrizzleQueryError ? e.cause : e;

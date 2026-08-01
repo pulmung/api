@@ -304,4 +304,92 @@ describe('Report (e2e) — POST /reports (접수만, 심사 주체 없음)', () 
       expect(rows[0].targetAuthorId).toBe(bobId);
     });
   });
+
+  /**
+   * 탈퇴가 신고 회피 수단이 되면 안 된다 — 남의 글에 단 댓글은 작성자가 탈퇴해도 남으므로
+   * (comments.authorId set null) 신고 경로가 열려 있어야 한다.
+   *
+   * 이 케이스들이 `ReportTargetReader.findTargetMeta`의 두 분기를 가른다:
+   * 바깥 null(=대상 비존재 → 404) vs `authorId: null`(=대상 존재, 작성자 탈퇴 → 201).
+   * 반환 shape를 옛 `Promise<string | null>`로 되돌리면 첫 케이스가 404로 터진다 —
+   * **타입으로는 안 잡히는 회귀**라 이 테스트가 방어선이다.
+   */
+  describe('탈퇴 유저가 남긴 댓글도 신고할 수 있다', () => {
+    // 보브(살아있음)의 글에 단 댓글 — 탈퇴자 자기 글이면 글째로 사라져 이 상태가 안 생긴다.
+    const QUIT_COMMENT_ID = '00000000-0000-7000-8000-0000000000c1';
+    let goneUserId: string;
+
+    beforeEach(async () => {
+      await signup('report-gone-author', '떠난작가');
+      const [row] = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.nickname, '떠난작가'));
+      goneUserId = row.id;
+
+      await db.insert(comments).values({
+        id: QUIT_COMMENT_ID,
+        postId: POST_ID,
+        authorId: goneUserId,
+        content: '떠난 사람의 댓글',
+      });
+
+      await db.delete(users).where(eq(users.id, goneUserId));
+    });
+
+    it('201: 댓글 신고 — targetAuthorId는 NULL로 접수된다', async () => {
+      const { status } = await report({
+        targetType: 'comment',
+        targetId: QUIT_COMMENT_ID,
+        reason: 'abuse',
+      });
+      expect(status).toBe(201);
+
+      const rows = await selectReports();
+      expect(rows).toHaveLength(1);
+      expect(rows[0].targetId).toBe(QUIT_COMMENT_ID);
+      expect(rows[0].targetAuthorId).toBeNull();
+    });
+
+    it("404: targetType 'user'로 탈퇴 유저를 신고하면 대상 비존재다", async () => {
+      // 유저 신고는 대상 자신이 작성자라 행이 없으면 그냥 없는 대상이다 —
+      // 위 케이스와 갈리는 지점(바깥 null vs authorId null).
+      const { status, body } = await report({
+        targetType: 'user',
+        targetId: goneUserId,
+        reason: 'abuse',
+      });
+      expect(status).toBe(404);
+      expect(body.errorCode).toBe('REPORT_TARGET_NOT_FOUND');
+      expect(await selectReports()).toHaveLength(0);
+    });
+
+    it('404: 탈퇴자가 쓴 글은 함께 사라져 신고 대상이 아니다', async () => {
+      // 글은 댓글과 정책이 갈린다(cascade) — 그래서 여기선 authorId NULL이 아니라
+      // 대상 비존재다. 두 정책의 차이가 응답으로 드러나는 지점.
+      const quitPostId = '00000000-0000-7000-8000-0000000000c9';
+      await signup('report-gone-poster', '떠난글쟁이');
+      const [poster] = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.nickname, '떠난글쟁이'));
+      await db.insert(posts).values({
+        id: quitPostId,
+        authorId: poster.id,
+        title: '제목',
+        content: '<p>본문</p>',
+        excerpt: '본문',
+        imageKeys: [],
+      });
+      await db.delete(users).where(eq(users.id, poster.id));
+
+      const { status, body } = await report({
+        targetType: 'post',
+        targetId: quitPostId,
+        reason: 'spam',
+      });
+      expect(status).toBe(404);
+      expect(body.errorCode).toBe('REPORT_TARGET_NOT_FOUND');
+    });
+  });
 });
