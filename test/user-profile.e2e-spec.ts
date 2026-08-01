@@ -7,7 +7,13 @@ import { Server } from 'node:http';
 import { Pool } from 'pg';
 import { DrizzleDB } from '../src/database/drizzle.constants';
 import { sessions, users } from '../src/database/schema';
-import { setupE2E } from './helpers/setup-e2e';
+import { FakeFileStorage, setupE2E } from './helpers/setup-e2e';
+import { TEST_FILE_BASE_URL } from './helpers/test-env';
+
+// 아바타 key — POST /files(purpose: user-profile-image)가 발급하는 형태.
+const AVATAR_KEY =
+  'user-profile-image/0198c5b2-2f74-7abc-8def-0123456789ab.jpg';
+const AVATAR_URL = `${TEST_FILE_BASE_URL}/${AVATAR_KEY}`;
 
 describe('UserProfile (e2e)', () => {
   let app: INestApplication;
@@ -15,11 +21,12 @@ describe('UserProfile (e2e)', () => {
   let db: DrizzleDB;
   let server: Server;
   let pool: Pool;
+  let fakeStorage: FakeFileStorage;
   let meToken: string;
   let meId: string;
 
   beforeAll(async () => {
-    ({ app, container, db, pool } = await setupE2E());
+    ({ app, container, db, pool, fakeStorage } = await setupE2E());
     server = app.getHttpServer() as Server;
   });
 
@@ -40,6 +47,8 @@ describe('UserProfile (e2e)', () => {
   // 닉네임이 전역 유니크 + PATCH가 그걸 변조하므로 매 테스트 유저를 리셋하고 새로 가입한다
   // (user-plant E2E처럼 beforeAll 가입을 유지하면 테스트 간 닉네임 상태가 샌다).
   beforeEach(async () => {
+    // head 기본값 = "존재" — 미업로드 시뮬레이션한 테스트가 다음으로 새지 않게 리셋.
+    fakeStorage.missingKeys.clear();
     await db.delete(sessions);
     await db.delete(users);
     meToken = await signup('user-profile-me', '프로필유저');
@@ -70,6 +79,8 @@ describe('UserProfile (e2e)', () => {
     provider: 'kakao',
     email: 'test@example.com',
     nickname: '프로필유저',
+    // 가입 직후엔 아바타가 없다 — 기본 이미지는 서버가 주지 않는다(클라 소유).
+    profileImageUrl: null,
     createdAt: expect.stringMatching(
       /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/,
     ) as unknown,
@@ -114,7 +125,10 @@ describe('UserProfile (e2e)', () => {
     });
 
     it('200: 현재 닉네임 그대로 no-op — 같은 행이라 유니크 충돌 아님', async () => {
-      const { status, body } = await patchMe({ nickname: '프로필유저' }, meToken);
+      const { status, body } = await patchMe(
+        { nickname: '프로필유저' },
+        meToken,
+      );
       expect(status).toBe(200);
       expect(body).toEqual(meProfile());
     });
@@ -155,6 +169,84 @@ describe('UserProfile (e2e)', () => {
         .from(users)
         .where(eq(users.id, meId));
       expect(row.nickname).toBe('프로필유저');
+    });
+  });
+
+  // 아바타는 merge-patch 3분기(부재/값/null)를 실제로 쓰는 첫 필드다 — nickname은 notnull이라
+  // 해제가 없어 이 축이 검증된 적이 없었다.
+  describe('PATCH /users/me — profileImageKey (merge-patch 3분기)', () => {
+    const storedKey = async () => {
+      const [row] = await db
+        .select({ key: users.profileImageKey })
+        .from(users)
+        .where(eq(users.id, meId));
+      return row.key;
+    };
+
+    it('200: 값 = 교체 — 응답은 URL, DB엔 불투명 key', async () => {
+      const { status, body } = await patchMe(
+        { profileImageKey: AVATAR_KEY },
+        meToken,
+      );
+      expect(status).toBe(200);
+      expect(body).toEqual({ ...meProfile(), profileImageUrl: AVATAR_URL });
+
+      // 저장은 key만 — 전체 URL을 굽지 않는다(docs/file-upload.md §6).
+      expect(await storedKey()).toBe(AVATAR_KEY);
+
+      const { body: fetched } = await getMe(meToken);
+      expect(fetched.profileImageUrl).toBe(AVATAR_URL);
+    });
+
+    it('200: 필드 부재 = 미변경 — 닉네임만 고쳐도 아바타가 살아있다', async () => {
+      await patchMe({ profileImageKey: AVATAR_KEY }, meToken);
+
+      const { status, body } = await patchMe({ nickname: '새닉네임' }, meToken);
+      expect(status).toBe(200);
+      expect(body.profileImageUrl).toBe(AVATAR_URL);
+      expect(await storedKey()).toBe(AVATAR_KEY);
+    });
+
+    it('200: null = 해제 — 부재(미변경)와 갈리는 지점', async () => {
+      await patchMe({ profileImageKey: AVATAR_KEY }, meToken);
+
+      const { status, body } = await patchMe(
+        { profileImageKey: null },
+        meToken,
+      );
+      expect(status).toBe(200);
+      expect(body.profileImageUrl).toBeNull();
+      expect(await storedKey()).toBeNull();
+    });
+
+    it('422: 다른 purpose의 key — 정책 우회 차단(prefix 검증)', async () => {
+      const { status, body } = await patchMe(
+        {
+          profileImageKey:
+            'post-image/0198c5b2-2f74-7abc-8def-0123456789ab.jpg',
+        },
+        meToken,
+      );
+      expect(status).toBe(422);
+      expect(body.errorCode).toBe('INVALID_PROFILE_IMAGE');
+      expect(await storedKey()).toBeNull();
+    });
+
+    it('422: presign만 받고 업로드 안 한 key — 첨부 시점 head 검증', async () => {
+      fakeStorage.missingKeys.add(AVATAR_KEY);
+
+      const { status, body } = await patchMe(
+        { profileImageKey: AVATAR_KEY },
+        meToken,
+      );
+      expect(status).toBe(422);
+      expect(body.errorCode).toBe('PROFILE_IMAGE_NOT_UPLOADED');
+      expect(await storedKey()).toBeNull();
+    });
+
+    it('400: 빈 문자열 — 해제는 null이지 ""가 아니다', async () => {
+      const { status } = await patchMe({ profileImageKey: '' }, meToken);
+      expect(status).toBe(400);
     });
   });
 });

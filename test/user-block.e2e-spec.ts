@@ -77,10 +77,7 @@ describe('UserBlock (e2e) — PUT·DELETE /users/:userId/block + GET /users/me/b
     return { status: res.status, body: res.body as Record<string, unknown> };
   };
 
-  const listBlocks = async (
-    query = '',
-    token: string | null = aliceToken,
-  ) => {
+  const listBlocks = async (query = '', token: string | null = aliceToken) => {
     let req = request(server).get(`/users/me/blocks${query}`);
     if (token !== null) req = req.set('Authorization', `Bearer ${token}`);
     const res = await req;
@@ -161,7 +158,11 @@ describe('UserBlock (e2e) — PUT·DELETE /users/:userId/block + GET /users/me/b
       const { status, body } = await listBlocks();
       expect(status).toBe(200);
       expect(body.blocks).toHaveLength(1);
-      expect(body.blocks[0].user).toEqual({ id: bobId, nickname: '보브' });
+      expect(body.blocks[0].user).toEqual({
+        id: bobId,
+        nickname: '보브',
+        profileImageUrl: null,
+      });
       expect(body.nextCursor).toBeNull();
     });
 

@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { FileModule } from '../file/file.module';
 import { BlockUserUseCase } from './application/block-user.usecase';
 import { UnblockUserUseCase } from './application/unblock-user.usecase';
 import { BlockQueryService } from './application/block-query.service';
@@ -23,11 +24,13 @@ import { ReportController } from './presentation/report.controller';
  * 결: DI가 아닌 계약 조각은 `exports`가 아니라 파일 경계로 공개한다). 소비처는
  * post/comment의 reader이고, 방향은 `post → moderation` 한 방향이다.
  *
- * imports도 없다 — 신고 대상 검증(reports)은 posts·comments·users를 **직접 select**한다
- * (CQRS 읽기의 테이블 횡단은 모듈 경계 위반이 아니다 — post.reader가 users·plants를
- * join하는 것과 같은 경로).
+ * imports는 FileModule 하나뿐이다 — 차단 목록의 상대 아바타 읽기 URL을 조합하는
+ * `PublicFileUrlResolver` 때문이고, FileModule은 imports가 0이라 순환이 없다. 신고 대상
+ * 검증(reports)은 posts·comments·users를 **직접 select**한다(CQRS 읽기의 테이블 횡단은
+ * 모듈 경계 위반이 아니다 — post.reader가 users·plants를 join하는 것과 같은 경로).
  */
 @Module({
+  imports: [FileModule],
   controllers: [BlockController, ReportController],
   providers: [
     BlockUserUseCase,

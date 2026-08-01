@@ -1,5 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { PublicFileUrlResolver } from '../../file/infrastructure/public-file-url.resolver';
+import {
+  toUserSummaryView,
+  type UserSummaryRow,
+  type UserSummaryView,
+} from '../../user/application/user-summary';
 import { PostReader } from '../repository/post.reader';
 
 // 게시글 읽기 모델 — 응답으로 흐르는 경계 → 명시 타입(§5). 내부 행 타입은 reader 추론.
@@ -9,7 +14,7 @@ export type PostListItem = {
   excerpt: string;
   // 첫 이미지의 읽기 URL — 이미지 없는 글이면 null(목록 프리뷰는 텍스트만).
   thumbnailUrl: string | null;
-  author: { id: string; nickname: string };
+  author: UserSummaryView;
   // 식물 태그 요약 — 무관한 글이면 null.
   plant: { id: string; name: string } | null;
   // 살아있는 댓글 수(루트+답글) — posts.commentCount 비정규화 컬럼 그대로.
@@ -99,7 +104,7 @@ export class PostQueryService {
       commentCount: number;
       likeCount: number;
       createdAt: Date;
-      author: { id: string; nickname: string };
+      author: UserSummaryRow;
       plant: { id: string; name: string } | null;
     },
     isLiked: boolean,
@@ -111,7 +116,7 @@ export class PostQueryService {
       thumbnailUrl: row.thumbnailKey
         ? this.urlResolver.resolve(row.thumbnailKey)
         : null,
-      author: row.author,
+      author: toUserSummaryView(row.author, this.urlResolver),
       plant: row.plant,
       commentCount: row.commentCount,
       likeCount: row.likeCount,

@@ -92,7 +92,11 @@ describe('Post 작성 (e2e)', () => {
     expect(content).not.toContain('<h1>');
     // 조회 표현: title trim·작성자·태그·썸네일·발췌.
     expect(body.title).toBe('잎이 갈변해요');
-    expect(body.author).toEqual({ id: authorId, nickname: '글쓴이' });
+    expect(body.author).toEqual({
+      id: authorId,
+      nickname: '글쓴이',
+      profileImageUrl: null,
+    });
     expect(body.plant).toEqual({ id: catalog.id, name: '몬스테라 알보' });
     expect(body.thumbnailUrl).toBe(imgSrc(IMG_KEY));
     expect(body.excerpt).toBe(
@@ -105,7 +109,9 @@ describe('Post 작성 (e2e)', () => {
       .select()
       .from(posts)
       .where(eq(posts.id, body.id as string));
-    expect(row.excerpt).toBe('우리집 몬스테라 잎이 갈색이에요 혹시 과습인가요?');
+    expect(row.excerpt).toBe(
+      '우리집 몬스테라 잎이 갈색이에요 혹시 과습인가요?',
+    );
     expect(row.thumbnailKey).toBe(IMG_KEY);
     expect(row.imageKeys).toEqual([IMG_KEY]);
   });

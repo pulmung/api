@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
+import { FileModule } from '../file/file.module';
 import { PostModule } from '../post/post.module';
 import { DeleteUserUseCase } from './application/delete-user.usecase';
 import { UpdateUserUseCase } from './application/update-user.usecase';
+import { UserQueryService } from './application/user-query.service';
 import { UserController } from './presentation/user.controller';
 import { UserWriter } from './repository/user.writer';
 import { UserReader } from './repository/user.reader';
@@ -14,9 +16,18 @@ import { UserReader } from './repository/user.reader';
   // 탈퇴 유스케이스가 auth가 아니라 여기 사는 이유: 라우트가 /users/me이고 엔티티 소유자가
   // user다(§3 엔티티 소유권). auth에 두는 대안은 방향이 뒤집힌다 — AuthModule → UserModule이
   // 이미 있고, 세션 폐기는 sessions.userId cascade가 이미 해서 auth의 협조가 필요 없다.
-  imports: [PostModule],
+  //
+  // FileModule: 아바타의 첨부 시점 head() 실존 검증(S3FileStorage)과 읽기 URL 조합
+  // (PublicFileUrlResolver). imports가 0인 모듈이라 순환 없음.
+  imports: [PostModule, FileModule],
   controllers: [UserController],
-  providers: [UpdateUserUseCase, DeleteUserUseCase, UserWriter, UserReader],
+  providers: [
+    UpdateUserUseCase,
+    DeleteUserUseCase,
+    UserQueryService,
+    UserWriter,
+    UserReader,
+  ],
   exports: [UserWriter, UserReader],
 })
 export class UserModule {}

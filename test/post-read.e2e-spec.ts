@@ -4,6 +4,7 @@ import { INestApplication } from '@nestjs/common';
 import { StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { Server } from 'node:http';
 import { Pool } from 'pg';
+import { eq } from 'drizzle-orm';
 import { DrizzleDB } from '../src/database/drizzle.constants';
 import { plants, posts, users, type NewPost } from '../src/database/schema';
 import { setupE2E } from './helpers/setup-e2e';
@@ -89,7 +90,10 @@ describe('PostRead (e2e) — 공개 게시판 읽기', () => {
     it('200: 아이템 형태 — 작성자·태그·썸네일 URL·발췌, content는 목록에 없다(누출 가드)', async () => {
       const [catalog] = await db
         .insert(plants)
-        .values({ name: '몬스테라 알보', images: [{ key: 'plant-image/c.jpg' }] })
+        .values({
+          name: '몬스테라 알보',
+          images: [{ key: 'plant-image/c.jpg' }],
+        })
         .returning({ id: plants.id });
       await insertPost({
         id: postId(1),
@@ -108,7 +112,7 @@ describe('PostRead (e2e) — 공개 게시판 읽기', () => {
           title: '잎이 갈변해요',
           excerpt: '긴 본문…',
           thumbnailUrl: `${TEST_FILE_BASE_URL}/post-image/thumb.jpg`,
-          author: { id: authorAId, nickname: '작가A' },
+          author: { id: authorAId, nickname: '작가A', profileImageUrl: null },
           plant: { id: catalog.id, name: '몬스테라 알보' },
           commentCount: 0,
           likeCount: 0,
@@ -122,19 +126,54 @@ describe('PostRead (e2e) — 공개 게시판 읽기', () => {
       expect(body.posts[0]).not.toHaveProperty('updatedAt');
     });
 
+    // 작성자 아바타 — reader가 실어온 불투명 key를 query service가 URL로 조합하는 경로.
+    // 전파 누락 자체는 컴파일 에러라 여기선 **값이 맞는지**만 본다(대표 1곳).
+    it('200: 작성자 아바타가 읽기 URL로 조합된다', async () => {
+      const key = 'user-profile-image/avatar-a.jpg';
+      await db
+        .update(users)
+        .set({ profileImageKey: key })
+        .where(eq(users.id, authorAId));
+      await insertPost({ id: postId(1) });
+
+      const { body } = await getList();
+      expect(body.posts[0].author).toEqual({
+        id: authorAId,
+        nickname: '작가A',
+        profileImageUrl: `${TEST_FILE_BASE_URL}/${key}`,
+      });
+
+      await db
+        .update(users)
+        .set({ profileImageKey: null })
+        .where(eq(users.id, authorAId));
+    });
+
     it('200: limit=2 커서 워크 — 2/2/1, 무중복·무누락, 끝에서 null', async () => {
       await Promise.all(
         [1, 2, 3, 4, 5].map((n) => insertPost({ id: postId(n * 10) })),
       );
 
       const page1 = await getList({ limit: '2' });
-      expect(page1.body.posts.map((p) => p.id)).toEqual([postId(50), postId(40)]);
+      expect(page1.body.posts.map((p) => p.id)).toEqual([
+        postId(50),
+        postId(40),
+      ]);
       expect(page1.body.nextCursor).toBe(postId(40));
 
-      const page2 = await getList({ limit: '2', cursor: page1.body.nextCursor! });
-      expect(page2.body.posts.map((p) => p.id)).toEqual([postId(30), postId(20)]);
+      const page2 = await getList({
+        limit: '2',
+        cursor: page1.body.nextCursor!,
+      });
+      expect(page2.body.posts.map((p) => p.id)).toEqual([
+        postId(30),
+        postId(20),
+      ]);
 
-      const page3 = await getList({ limit: '2', cursor: page2.body.nextCursor! });
+      const page3 = await getList({
+        limit: '2',
+        cursor: page2.body.nextCursor!,
+      });
       expect(page3.body.posts.map((p) => p.id)).toEqual([postId(10)]);
       expect(page3.body.nextCursor).toBeNull();
     });
@@ -152,17 +191,34 @@ describe('PostRead (e2e) — 공개 게시판 읽기', () => {
         .insert(plants)
         .values({ name: '필로덴드론', images: [{ key: 'plant-image/p.jpg' }] })
         .returning({ id: plants.id });
-      await insertPost({ id: postId(1), authorId: authorAId, plantId: catalog.id });
+      await insertPost({
+        id: postId(1),
+        authorId: authorAId,
+        plantId: catalog.id,
+      });
       await insertPost({ id: postId(2), authorId: authorAId });
-      await insertPost({ id: postId(3), authorId: authorBId, plantId: catalog.id });
+      await insertPost({
+        id: postId(3),
+        authorId: authorBId,
+        plantId: catalog.id,
+      });
 
       const byAuthor = await getList({ authorId: authorAId });
-      expect(byAuthor.body.posts.map((p) => p.id)).toEqual([postId(2), postId(1)]);
+      expect(byAuthor.body.posts.map((p) => p.id)).toEqual([
+        postId(2),
+        postId(1),
+      ]);
 
       const byPlant = await getList({ plantId: catalog.id });
-      expect(byPlant.body.posts.map((p) => p.id)).toEqual([postId(3), postId(1)]);
+      expect(byPlant.body.posts.map((p) => p.id)).toEqual([
+        postId(3),
+        postId(1),
+      ]);
 
-      const combined = await getList({ authorId: authorAId, plantId: catalog.id });
+      const combined = await getList({
+        authorId: authorAId,
+        plantId: catalog.id,
+      });
       expect(combined.body.posts.map((p) => p.id)).toEqual([postId(1)]);
     });
 
@@ -194,7 +250,7 @@ describe('PostRead (e2e) — 공개 게시판 읽기', () => {
         title: '제목',
         excerpt: '우리집 몬스테라',
         thumbnailUrl: null,
-        author: { id: authorAId, nickname: '작가A' },
+        author: { id: authorAId, nickname: '작가A', profileImageUrl: null },
         plant: null,
         commentCount: 0,
         likeCount: 0,

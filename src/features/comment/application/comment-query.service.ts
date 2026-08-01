@@ -1,8 +1,15 @@
 import { Injectable } from '@nestjs/common';
+import { PublicFileUrlResolver } from '../../file/infrastructure/public-file-url.resolver';
+import {
+  toUserSummaryViewOrNull,
+  type UserSummaryRow,
+  type UserSummaryView,
+} from '../../user/application/user-summary';
 import { CommentReader } from '../repository/comment.reader';
 
 // 댓글 읽기 모델 — 응답으로 흐르는 경계 → 명시 타입(§5). 내부 행 타입은 reader 추론.
-type UserSummary = { id: string; nickname: string };
+// 유저 요약은 user가 소유한 `UserSummaryView`를 쓴다 — 예전엔 여기 로컬 타입을 복제했는데,
+// 아바타가 붙자 post·moderation과 함께 3중 복제가 드러나 조각으로 승격했다.
 
 // 단건 표현(POST 201 × 2 · PATCH 200 공유 — 변경 이유 동일: "댓글을 어떻게 단건
 // 표현하나"). replyCount는 목록 컨텍스트의 집계라 단건엔 없다 — 없는 필드를 0으로
@@ -15,8 +22,8 @@ export type CommentDetail = {
   // null = 작성자 탈퇴(comment.table.ts authorId set null). deleted와는 **직교하는 축**이라
   // union 브랜치를 늘리지 않고 nullable로 둔다 — deleted는 "본문이 있나", 이건 "작성자가
   // 있나"다. 둘을 union으로 곱하면 브랜치가 늘고 클라 분기가 하나 더 생긴다.
-  author: UserSummary | null;
-  mentionedUser: UserSummary | null;
+  author: UserSummaryView | null;
+  mentionedUser: UserSummaryView | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -29,7 +36,7 @@ export type RootCommentItem =
       id: string;
       content: string;
       // null = 작성자 탈퇴 — 위 CommentDetail.author와 같은 이유로 nullable(브랜치 X).
-      author: UserSummary | null;
+      author: UserSummaryView | null;
       replyCount: number;
       createdAt: string;
       updatedAt: string;
@@ -52,8 +59,8 @@ export type ReplyItem = {
   id: string;
   content: string;
   // null = 작성자 탈퇴 — mentionedUser와 같은 형태가 됐다(둘 다 users set null의 결과).
-  author: UserSummary | null;
-  mentionedUser: UserSummary | null;
+  author: UserSummaryView | null;
+  mentionedUser: UserSummaryView | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -67,7 +74,10 @@ export type ReplyPage = {
 // read model로 빚는다. POST 201·PATCH 200 재조회와 목록이 표현을 공유한다.
 @Injectable()
 export class CommentQueryService {
-  constructor(private readonly reader: CommentReader) {}
+  constructor(
+    private readonly reader: CommentReader,
+    private readonly urlResolver: PublicFileUrlResolver,
+  ) {}
 
   // viewerId 없음 = 익명 뷰어(공개 열람) → 차단 필터가 적용되지 않는다(차단은 뷰어별 개념).
   async findRootPage(params: {
@@ -111,8 +121,11 @@ export class CommentQueryService {
       replies: page.map((row) => ({
         id: row.id,
         content: row.content,
-        author: row.author,
-        mentionedUser: row.mentionedUser,
+        author: toUserSummaryViewOrNull(row.author, this.urlResolver),
+        mentionedUser: toUserSummaryViewOrNull(
+          row.mentionedUser,
+          this.urlResolver,
+        ),
         // z.iso.datetime()은 Date를 거부한다 — 문자열 직렬화는 여기서(post 전례).
         createdAt: row.createdAt.toISOString(),
         updatedAt: row.updatedAt.toISOString(),
@@ -129,8 +142,11 @@ export class CommentQueryService {
       id: row.id,
       parentId: row.parentId,
       content: row.content,
-      author: row.author,
-      mentionedUser: row.mentionedUser,
+      author: toUserSummaryViewOrNull(row.author, this.urlResolver),
+      mentionedUser: toUserSummaryViewOrNull(
+        row.mentionedUser,
+        this.urlResolver,
+      ),
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     };
@@ -143,7 +159,7 @@ export class CommentQueryService {
       deletedAt: Date | null;
       createdAt: Date;
       updatedAt: Date;
-      author: UserSummary | null;
+      author: UserSummaryRow | null;
     },
     replyCount: number,
   ): RootCommentItem {
@@ -167,7 +183,7 @@ export class CommentQueryService {
       deleted: false,
       id: row.id,
       content: row.content,
-      author: row.author,
+      author: toUserSummaryViewOrNull(row.author, this.urlResolver),
       replyCount,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),

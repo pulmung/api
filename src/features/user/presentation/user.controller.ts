@@ -15,12 +15,14 @@ import type { AuthUser } from '../../../common/auth/auth-user';
 import { ApiErrors } from '../../../common/swagger/api-errors.decorator';
 import { DeleteUserUseCase } from '../application/delete-user.usecase';
 import { UpdateUserUseCase } from '../application/update-user.usecase';
+import { UserQueryService } from '../application/user-query.service';
 import {
   InvalidNicknameError,
+  InvalidProfileImageError,
   NicknameTakenError,
+  ProfileImageNotUploadedError,
   UserNotFoundError,
 } from '../domain/user.error';
-import { UserReader } from '../repository/user.reader';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserProfileDto } from './dto/user-profile.dto';
 
@@ -29,7 +31,7 @@ export class UserController {
   constructor(
     private readonly updateUser: UpdateUserUseCase,
     private readonly deleteUser: DeleteUserUseCase,
-    private readonly userReader: UserReader,
+    private readonly userQuery: UserQueryService,
   ) {}
 
   @Get('me')
@@ -41,34 +43,45 @@ export class UserController {
     type: UserProfileDto,
   })
   async me(@CurrentUser() user: AuthUser): Promise<UserProfileDto> {
-    // 조합 0(파일 URL·조인 없음) — controller → reader 직행(§2).
-    const profile = await this.userReader.findById(user.id);
+    // 아바타 key → 읽기 URL 조합이 생겨 "조합 있음"이 됐다 → 쿼리 서비스 경유(§2).
+    const profile = await this.userQuery.findMyProfile(user.id);
     // 무상태 JWT라 "행이 사라진 토큰"이 표현 가능 — 404.
     if (!profile) throw new UserNotFoundError();
-    // z.iso.datetime()은 Date를 거부한다 — 쿼리 서비스가 없으니 직렬화는 여기서.
-    return { ...profile, createdAt: profile.createdAt.toISOString() };
+    return profile;
   }
 
   @Patch('me')
   @Authenticated()
-  @ApiErrors(UserNotFoundError, InvalidNicknameError, NicknameTakenError)
+  @ApiErrors(
+    UserNotFoundError,
+    InvalidNicknameError,
+    NicknameTakenError,
+    InvalidProfileImageError,
+    ProfileImageNotUploadedError,
+  )
   @ZodResponse({
     status: 200,
     description:
-      '내 프로필 부분 수정 (JSON Merge Patch — 현재 nickname만). 응답 = GET /users/me와 같은 조회 표현',
+      '내 프로필 부분 수정 (JSON Merge Patch — nickname · profileImageKey). ' +
+      '필드 부재 = 미변경, null = 해제(profileImageKey만), 값 = 교체. ' +
+      '응답 = GET /users/me와 같은 조회 표현',
     type: UserProfileDto,
   })
   async update(
     @Body() dto: UpdateUserDto,
     @CurrentUser() user: AuthUser,
   ): Promise<UserProfileDto> {
-    await this.updateUser.execute({ id: user.id, nickname: dto.nickname });
+    await this.updateUser.execute({
+      id: user.id,
+      nickname: dto.nickname,
+      profileImageKey: dto.profileImageKey,
+    });
 
     // 수정 200 = 조회 표현(재조회) — user-plant PATCH와 동일 패턴.
-    const profile = await this.userReader.findById(user.id);
+    const profile = await this.userQuery.findMyProfile(user.id);
     // 방금 수정한 행이라 실패는 불변식 위반 — 404가 아니라 500(unexpected)이 정직하다.
     if (!profile) throw new Error(`updated user not readable: ${user.id}`);
-    return { ...profile, createdAt: profile.createdAt.toISOString() };
+    return profile;
   }
 
   // 대상은 항상 JWT sub(본인) — 남의 계정을 지우는 경로는 만들지 않는다(admin이 생기면 별도).

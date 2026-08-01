@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { FileModule } from '../file/file.module';
 import { PostModule } from '../post/post.module';
 import { CreateCommentUseCase } from './application/create-comment.usecase';
 import { CreateReplyUseCase } from './application/create-reply.usecase';
@@ -15,8 +16,11 @@ import { CommentController } from './presentation/comment.controller';
   // **같은 트랜잭션**에 태우는데, posts 테이블의 쓰기는 post 모듈이 소유하기 때문이다.
   // (예전엔 comment.writer가 posts를 직접 UPDATE해서 이 의존이 코드에만 있고 모듈엔
   //  안 보였다 — 경계를 넘겨 쓰면 exports/imports로 드러낸다는 §3의 원칙대로 명시화.)
-  // users 의존은 여전히 DB 레벨(FK·읽기 join)뿐이라 UserModule은 불필요하다.
-  imports: [PostModule],
+  // users 의존은 여전히 DB 레벨(FK·읽기 join)뿐이라 UserModule은 불필요하다 — 작성자
+  // 아바타의 projection·URL변환 조각도 user 소유지만 순수 함수라 파일 import로 끝난다
+  // (excludeBlocked와 같은 결). FileModule은 그 변환이 쓰는 PublicFileUrlResolver 때문이고,
+  // FileModule은 imports가 0이라 순환이 없다.
+  imports: [PostModule, FileModule],
   controllers: [PostCommentController, CommentController],
   providers: [
     CreateCommentUseCase,

@@ -129,7 +129,7 @@ describe('CommentRead (e2e) — 공개 댓글 읽기', () => {
           deleted: false,
           id: commentId(1),
           content: '첫 댓글',
-          author: { id: userAId, nickname: '댓글러A' },
+          author: { id: userAId, nickname: '댓글러A', profileImageUrl: null },
           replyCount: 0,
           createdAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/) as unknown,
           updatedAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/) as unknown,
@@ -248,7 +248,7 @@ describe('CommentRead (e2e) — 공개 댓글 읽기', () => {
         {
           id: commentId(11),
           content: '일반 답글',
-          author: { id: userBId, nickname: '댓글러B' },
+          author: { id: userBId, nickname: '댓글러B', profileImageUrl: null },
           mentionedUser: null,
           createdAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/) as unknown,
           updatedAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/) as unknown,
@@ -256,8 +256,12 @@ describe('CommentRead (e2e) — 공개 댓글 읽기', () => {
         {
           id: commentId(12),
           content: '지목 답글',
-          author: { id: userAId, nickname: '댓글러A' },
-          mentionedUser: { id: userBId, nickname: '댓글러B' },
+          author: { id: userAId, nickname: '댓글러A', profileImageUrl: null },
+          mentionedUser: {
+            id: userBId,
+            nickname: '댓글러B',
+            profileImageUrl: null,
+          },
           createdAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/) as unknown,
           updatedAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/) as unknown,
         },
@@ -338,12 +342,14 @@ describe('CommentRead (e2e) — 공개 댓글 읽기', () => {
   describe('작성자 탈퇴 — 댓글은 남고 author만 null', () => {
     // 전용 유저(지워야 하므로 공유 픽스처 사용 불가) — 가입 후 id를 준다.
     const signupTemp = async (nickname: string) => {
-      await request(server).post('/auth/signup').send({
-        provider: 'kakao',
-        platform: 'ios',
-        accessToken: `comment-read-${nickname}`,
-        nickname,
-      });
+      await request(server)
+        .post('/auth/signup')
+        .send({
+          provider: 'kakao',
+          platform: 'ios',
+          accessToken: `comment-read-${nickname}`,
+          nickname,
+        });
       const [row] = await db
         .select({ id: users.id })
         .from(users)
@@ -402,6 +408,7 @@ describe('CommentRead (e2e) — 공개 댓글 읽기', () => {
       expect(body.replies[0].author).toEqual({
         id: userAId,
         nickname: '댓글러A',
+        profileImageUrl: null,
       });
     });
   });

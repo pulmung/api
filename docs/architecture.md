@@ -165,7 +165,19 @@ features/<feature>/
 
   - ⚠️ **`request/`·`response/` 폴더 분리 금지.** 방향은 나누는 축이 아니다 — ① 탐색 질문은 "POST /plants 계약 어디?"이지 "응답들 어디?"가 아니고, ② 실제 파일이 방향으로 안 갈린다(`plant-detail.dto.ts` = param+response, `plant-list.dto.ts` = query+response, `plant-category.schema.ts` = 요청·응답 양쪽) → `param/`·`query/`·`shared/`로 새고, 유지하려면 파일을 쪼개야 해서 **파일 수가 되레 는다**. 같은 이유로 `.request.ts`/`.response.ts` 접미사도 안 쓴다(추가로 `create-plant.dto.ts` ↔ `create-plant.usecase.ts` 스템 짝을 잃는다).
   - `shared/`는 **그 feature가 공개하는 계약 표면**이다 — 남의 feature가 import해도 되는 건 여기 있는 것뿐(§3의 `exports`가 DI 없는 zod 스키마에서 갖는 형태). 경로에 `.../plant/presentation/shared/plant-image.schema`가 찍히면 "공개된 걸 쓴다"가 읽힌다. `dto/`를 가로질러 import하면 그건 경계 위반 신호다.
-  - **조각의 소유 feature = "이 모양이 바뀌는 계기를 가진 쪽"**. 예: `UserSummarySchema`(작성자·멘션 표시용 `{id, nickname}`)는 comment가 아니라 **user** 소유 — 바뀌는 계기가 "유저를 어떻게 요약하나"이지 댓글의 사정이 아니다. 소비처(comment·post)에 두면 옆 feature가 같은 모양을 인라인 복제한다(실제 발생 사례).
+  - **조각의 소유 feature = "이 모양이 바뀌는 계기를 가진 쪽"**. 예: `UserSummarySchema`(작성자·멘션 표시용)는 comment가 아니라 **user** 소유 — 바뀌는 계기가 "유저를 어떻게 요약하나"이지 댓글의 사정이 아니다. 소비처(comment·post)에 두면 옆 feature가 같은 모양을 인라인 복제한다(실제 발생 사례).
+  - ⚠️ **같은 소유권이 presentation 조각만이 아니라 그 뒤의 읽기 조각(projection·변환)에도 적용된다.** 공유 응답 조각은 대개 혼자 오지 않는다 — 뒤에 "그 컬럼들을 select하는 projection"과 "DB 값 → 응답 값 변환"이 붙어 있고, 그 둘을 소비처가 각자 들고 있으면 **필드 하나 추가에 N군데가 동시에 바뀐다**. 참조 구현(`UserSummary` 3종 세트):
+
+    | 층 | 파일 | 소비처 |
+    | --- | --- | --- |
+    | 응답 스키마 | `user/presentation/shared/user-summary.schema.ts` | DTO 5개 파일 |
+    | projection | `user/repository/user-summary.columns.ts` — `userSummaryColumns(t)` | post·comment·user-block **reader** |
+    | 변환 | `user/application/user-summary.ts` — `UserSummaryView`·`toUserSummaryView(row, resolver)` | post·comment·block **query service** |
+
+    실제 계기: 아바타(`profileImageUrl`) 추가가 reader 3곳·query service 3곳을 동시에 건드렸고, 그 전까지 `CommentQueryService`엔 로컬 `type UserSummary`가, post·moderation엔 인라인 리터럴이 복제돼 있었다.
+    - **projection이 상수가 아니라 함수인 이유**: comment.reader가 `alias(users, 'mentioned_users')`로 같은 테이블을 두 번 조인한다 — 별칭 테이블을 인자로 받아야 두 조인을 한 조각으로 덮는다. 파라미터 타입은 필요한 컬럼만 구조적으로 요구하고(`{id: PgColumn; …}`), **반환은 `Pick<T, …>`로 명시**한다 — 추론에 맡기면 제약으로 넓어져 drizzle select 결과가 통째로 `unknown`이 된다(§5 "경계는 명시"의 실제 사례).
+    - **DI 프로바이더가 아니라 순수 함수 + 인자**로 만든다. DI로 만들면 소비처 3개가 `UserModule`을 import해야 하는데, 조각이 필요로 하는 건 모듈이 아니라 값이다(`PublicFileUrlResolver`는 호출자가 이미 갖고 있다). `excludeBlocked`가 moderation을 import하지 않고 파일 import로 끝나는 것과 같은 형태 — **DI가 아닌 계약 조각은 `exports`가 아니라 파일 경계로 공개한다**.
+    - **이 부류의 누락은 조용하지 않다** — 응답 DTO가 새 필드를 요구하고 reader projection이 추론으로 흐르므로 빠뜨리면 **컴파일 에러**다. 그래서 `excludeBlocked`(§2-1)와 달리 전용 E2E로 묶지 않는다: 테스트는 "전파됐는가"가 아니라 **값이 맞는가**(URL 조합·null 분기)만 본다.
   - 파일명 suffix가 종류를 마저 구분한다: `.dto.ts`(=`createZodDto` 클래스) / `.schema.ts`(=zod 객체·enum) / `.field(s).ts`(=필드 조각). 여기서 `.schema.ts`는 **zod 전용**이다 — DB 테이블 정의는 `.table.ts`를 쓴다([CLAUDE.md](../CLAUDE.md) "테이블 정의 파일"). 같은 접미사를 쓰면 리소스명이 겹칠 때 Cmd+P가 두 레이어를 섞어 보여준다(실제 발생: `watering.schema.ts`). ⚠️ **`.schema.ts`가 `Dto` 클래스를 export하면 분류 실패 신호** — 그건 엔드포인트 계약이므로 `dto/*.dto.ts`다.
 - **응답 공유 기준 = "변경 이유가 같은가"**. 같으면 공유(`AuthTokensDto`를 login/signup/refresh가), 다르면 분리.
 - **생성(POST) 201 응답 = 그 리소스의 조회 표현**(REST 관례: 201 body ≒ GET 표현). 별도 "생성 응답 DTO"를 만들지 않고 조회 DTO를 재사용하며, 컨트롤러가 생성 직후 reader로 재조회해 반환한다 — 쿼리 1개를 내고 생성/조회 표현의 이원화를 구조적으로 차단. (예: POST /plants·GET /plants/:id가 `PlantDetailDto` 공유.)

@@ -5,6 +5,7 @@ import type { DrizzleDB } from '../../../database/drizzle.constants';
 import type { DrizzleTransactionalAdapter } from '../../../database/drizzle-transactional.adapter';
 import { plants, postLikes, posts, users } from '../../../database/schema';
 import { excludeBlocked } from '../../moderation/repository/block-filter';
+import { userSummaryColumns } from '../../user/repository/user-summary.columns';
 
 // 게시글 read model의 원천 행 — 부분 select(옵트인). content는 상세 전용이라 목록 제외
 // (본문 50k까지 가능 — 목록에 실으면 페이로드가 터진다). authorId 원시 컬럼 대신
@@ -22,7 +23,8 @@ const POST_LIST_ROW = {
   // 작성자 요약 — inner join(author_id notNull + onDelete cascade라 항상 존재).
   // 탈퇴하면 글 자체가 사라지므로 "작성자 없는 글"이 존재하지 않는다 — 댓글과 갈리는
   // 지점이다(comment.reader의 AUTHOR는 left join). 근거는 post.table.ts authorId doc.
-  author: { id: users.id, nickname: users.nickname },
+  // projection 조각은 user 소유 — 아바타 key가 여기 실려 오고 URL 조합은 query service 몫.
+  author: userSummaryColumns(users),
   // 식물 태그 요약 — left join 미매칭 시 drizzle이 객체째 null로 접는다(user-plant 전례).
   plant: { id: plants.id, name: plants.name },
 };
@@ -118,10 +120,7 @@ export class PostReader {
       .select({ postId: postLikes.postId })
       .from(postLikes)
       .where(
-        and(
-          eq(postLikes.userId, userId),
-          inArray(postLikes.postId, postIds),
-        ),
+        and(eq(postLikes.userId, userId), inArray(postLikes.postId, postIds)),
       );
     return new Set(rows.map((row) => row.postId));
   }

@@ -4,6 +4,7 @@ import { TransactionHost } from '@nestjs-cls/transactional';
 import type { DrizzleDB } from '../../../database/drizzle.constants';
 import type { DrizzleTransactionalAdapter } from '../../../database/drizzle-transactional.adapter';
 import { userBlocks, users } from '../../../database/schema';
+import { userSummaryColumns } from '../../user/repository/user-summary.columns';
 
 // 읽기 어댑터 — 순수 DB 접근. users 직접 join은 모듈 경계 위반이 아니라 CQRS 읽기의
 // 정상 경로다(post.reader 전례).
@@ -38,7 +39,8 @@ export class UserBlockReader {
     return this.db
       .select({
         // 차단 관계에 surrogate id가 없으므로(순수 관계 테이블) 커서는 상대 유저 id다.
-        user: { id: users.id, nickname: users.nickname },
+        // projection 조각은 user 소유 — URL 조합은 query service 몫(post·comment 전례).
+        user: userSummaryColumns(users),
         createdAt: userBlocks.createdAt,
       })
       .from(userBlocks)

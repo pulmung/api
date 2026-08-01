@@ -54,11 +54,17 @@ export class UserWriter {
   }
 
   /** @returns false = 비존재 (무상태 JWT sub가 가리키는 행이 사라진 경우) */
-  async update(id: string, patch: { nickname?: string }): Promise<boolean> {
-    // undefined 필드는 SET에서 제외 = 컬럼을 건드리지 않는다(merge-patch).
+  async update(
+    id: string,
+    patch: { nickname?: string; profileImageKey?: string | null },
+  ): Promise<boolean> {
+    // undefined 필드는 SET에서 제외 = 컬럼을 건드리지 않는다(merge-patch). null은 제외가
+    // 아니라 **해제**라 SET에 들어간다 — 이 구분이 3분기의 실체다(user-plant.writer 전례).
     // 빈 패치는 DTO(400)가 경계에서 막는다 — drizzle .set({})은 throw.
     const set: Partial<NewUser> = {};
     if (patch.nickname !== undefined) set.nickname = patch.nickname;
+    if (patch.profileImageKey !== undefined)
+      set.profileImageKey = patch.profileImageKey;
 
     try {
       // RETURNING id로 0행(=404) 감지 — user-plant writer와 동일 관용구.
@@ -77,7 +83,8 @@ export class UserWriter {
       ) {
         throw new NicknameTakenError();
       }
-      // 이 UPDATE는 nickname만 만지므로 provider 유니크는 못 뜬다 — 모르는 에러는 rethrow(§7).
+      // 이 UPDATE가 만지는 컬럼 중 유니크 제약은 nickname뿐이다(profileImageKey는 제약 없음)
+      // — provider 유니크는 뜰 수 없다. 모르는 에러는 rethrow(§7).
       throw e;
     }
   }

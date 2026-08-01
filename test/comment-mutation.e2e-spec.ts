@@ -135,7 +135,7 @@ describe('CommentMutation (e2e) — 작성·수정·삭제 + 카운터', () => {
         id: expect.stringMatching(/^[0-9a-f-]{36}$/i) as unknown,
         parentId: null,
         content: '첫 댓글',
-        author: { id: authorId, nickname: '댓글작성자' },
+        author: { id: authorId, nickname: '댓글작성자', profileImageUrl: null },
         mentionedUser: null,
         createdAt: expect.stringMatching(ISO) as unknown,
         updatedAt: expect.stringMatching(ISO) as unknown,
@@ -158,7 +158,9 @@ describe('CommentMutation (e2e) — 작성·수정·삭제 + 카운터', () => {
 
       const after = await selectPost();
       expect(after.commentCount).toBe(1);
-      expect(after.updatedAt.toISOString()).toBe(before.updatedAt.toISOString());
+      expect(after.updatedAt.toISOString()).toBe(
+        before.updatedAt.toISOString(),
+      );
     });
 
     it('404: 비존재 글 → POST_NOT_FOUND (FK 번역, 사전 SELECT 없음)', async () => {
@@ -201,8 +203,8 @@ describe('CommentMutation (e2e) — 작성·수정·삭제 + 카운터', () => {
         id: expect.stringMatching(/^[0-9a-f-]{36}$/i) as unknown,
         parentId: rootId,
         content: '@지목 답글',
-        author: { id: authorId, nickname: '댓글작성자' },
-        mentionedUser: { id: otherId, nickname: '이웃' },
+        author: { id: authorId, nickname: '댓글작성자', profileImageUrl: null },
+        mentionedUser: { id: otherId, nickname: '이웃', profileImageUrl: null },
         createdAt: expect.stringMatching(ISO) as unknown,
         updatedAt: expect.stringMatching(ISO) as unknown,
       });
@@ -232,7 +234,9 @@ describe('CommentMutation (e2e) — 작성·수정·삭제 + 카운터', () => {
       await seedReply(rootId);
       await deleteComment(rootId); // 답글 있음 → soft delete
 
-      const { status, body } = await createReply(rootId, { content: '늦은 답글' });
+      const { status, body } = await createReply(rootId, {
+        content: '늦은 답글',
+      });
       expect(status).toBe(404);
       expect(body.errorCode).toBe('COMMENT_NOT_FOUND');
     });

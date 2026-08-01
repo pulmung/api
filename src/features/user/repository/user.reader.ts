@@ -40,6 +40,8 @@ export class UserReader {
         provider: users.provider,
         email: users.email,
         nickname: users.nickname,
+        // 불투명 key — 읽기 URL 조합은 UserQueryService 몫(reader는 순수 DB 접근, §2).
+        profileImageKey: users.profileImageKey,
         createdAt: users.createdAt,
       })
       .from(users)

@@ -110,10 +110,22 @@ testing.md의 "가장 싸게 신뢰를 주는 레벨" 적용:
 | seam                            | 언제/어디서                                                                 |
 | ------------------------------- | --------------------------------------------------------------------------- |
 | 첨부 시점 `head()` 검증 + images jsonb | ✅ 구현됨 (`features/plant` 생성 usecase) — `plants.images` = 단일 jsonb(배열 of `{key, width?, height?}`). 다음 소비처(chat 등)도 같은 패턴 |
+| 아바타 = **단일 key 컬럼**(jsonb 배열 아님) | ✅ 구현됨 (`users.profile_image_key`, `PATCH /users/me`) — 아래 예외 절 참조 |
 | 이미지 치수                      | 클라 제공값 = 신뢰 불가 힌트(피드 CLS 방지용으론 충분). 진짜 치수는 추후 S3 이벤트→Lambda |
 | 고아 파일 정리                   | ~~S3 lifecycle 규칙~~ → **월간 mark-and-sweep GC**로 대체됨([todo.md](todo.md) 스토리지 항목이 이 줄을 대체 — 트리거 조건도 그쪽 참조) |
 | 원본 파일명 복원(채팅 다운로드)   | 메타를 message jsonb에 + presigned GET `ResponseContentDisposition`            |
 | `PUBLIC_FILE_BASE_URL` (읽기 URL 조합)  | ✅ 구현됨 (`PublicFileUrlResolver` — plant 조회 응답이 사용. private signed URL은 `PRIVATE_FILE_BASE_URL`로 이 축에서 확장) |
+
+### user-profile-image 예외 — jsonb 배열이 아니라 단일 text 컬럼
+
+`plants.images`·`user_plants.images`는 `jsonb<PlantImage[]>`인데 **아바타만 `users.profile_image_key: text` 단일 컬럼**이다. 일관성 결여가 아니라 jsonb가 사주던 것 둘이 여기선 값이 0이기 때문이다:
+
+- **개수**: 아바타는 0 또는 1개다. 배열이면 "2개"라는 **표현 가능한 잘못된 상태**가 생긴다(architecture.md §6 "유효하지 않은 상태를 표현 불가능하게").
+- **치수 힌트**: `PlantImage`의 `width`/`height`는 **피드 CLS 방지용**인데, 아바타는 컨테이너가 크기를 정하는 정사각 고정 렌더라 레이아웃 시프트가 없다.
+
+⚠️ "다른 소비처와 맞춘다"를 이유로 배열/jsonb로 되돌리지 말 것 — 판정 기준은 형태의 통일이 아니라 위 둘이다. 새 소비처가 생기면 같은 두 질문을 다시 던진다.
+
+또 아바타는 **`FILE_POLICIES`에서 크기가 다른 유일한 purpose**다(2 MiB vs 10 MiB). purpose를 나눠 얻는 실익이 이 차등이고, 그래서 첨부 시점 prefix 검증이 **정책 우회 차단**의 의미를 갖는다(10 MiB purpose로 발급받아 아바타에 붙이는 경로 — `features/user/domain/user-profile-image.ts` doc).
 
 ### post-image 예외 — 읽기 URL이 본문(HTML)에 구워진다
 

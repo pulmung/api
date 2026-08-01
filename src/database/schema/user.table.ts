@@ -60,6 +60,17 @@ export const users = pgTable(
     email: text(),
     // 유저가 직접 입력. 전역 유니크 — 중복 닉네임 금지.
     nickname: text().notNull().unique(UNIQUE_USERS_NICKNAME),
+    // 아바타 — 불투명 key만 저장(읽기 URL은 응답 시점 조합, docs/file-upload.md §6).
+    // null = 미설정: 기본 이미지는 **클라 소유**다. 서버가 기본 URL을 주면 "설정 안 함"과
+    // "설정함"이 구분 불가해지고 디자인 변경이 서버 배포가 된다.
+    //
+    // ⚠️ 다른 소비처(plants·user_plants)는 `images: jsonb<PlantImage[]>`인데 여기만 단일
+    // text 컬럼이다 — 일관성 결여가 아니라 두 가지 판정 결과다:
+    //   ① 아바타는 0 또는 1개다. 배열이면 "2개"라는 표현 가능한 잘못된 상태가 생긴다(§6).
+    //   ② PlantImage의 width/height는 **피드 CLS 방지용 힌트**인데(plant-image.ts) 아바타는
+    //      컨테이너가 크기를 정하는 정사각 고정 렌더라 레이아웃 시프트가 없다.
+    // 즉 jsonb가 사주던 것 둘 다 여기선 값이 0이다. "일관성"을 이유로 배열로 되돌리지 말 것.
+    profileImageKey: text(),
     createdAt: timestamp({ withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [

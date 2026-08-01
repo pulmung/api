@@ -35,4 +35,11 @@ export const FILE_POLICIES: Record<
     allowedContentTypes: ['image/jpeg', 'image/png', 'image/webp'],
     maxSizeBytes: 10 * 1024 * 1024, // 10 MiB
   },
+  // 유저 아바타. 다른 purpose(10 MiB)보다 작은 유일한 정책 — 아바타는 512px 정사각이면
+  // 충분하고(목록에서 40~80px로 렌더) 클라가 크롭하며 재인코딩하므로 큰 원본이 올라올
+  // 이유가 없다. purpose를 나눈 실익이 바로 이 차등이다.
+  'user-profile-image': {
+    allowedContentTypes: ['image/jpeg', 'image/png', 'image/webp'],
+    maxSizeBytes: 2 * 1024 * 1024, // 2 MiB
+  },
 };

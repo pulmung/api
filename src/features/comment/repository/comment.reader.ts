@@ -6,6 +6,7 @@ import type { DrizzleDB } from '../../../database/drizzle.constants';
 import type { DrizzleTransactionalAdapter } from '../../../database/drizzle-transactional.adapter';
 import { comments, posts, users } from '../../../database/schema';
 import { excludeBlocked } from '../../moderation/repository/block-filter';
+import { userSummaryColumns } from '../../user/repository/user-summary.columns';
 
 // 멘션된 유저 join용 별칭 — author(users)와 같은 테이블을 한 쿼리에서 두 번 조인한다.
 const mentionedUsers = alias(users, 'mentioned_users');
@@ -14,9 +15,10 @@ const mentionedUsers = alias(users, 'mentioned_users');
 // 작성자만 사라진다 — comment.table.ts). 미매칭 시 객체째 null(아래 멘션과 같은 결).
 // ⚠️ inner join으로 되돌리면 탈퇴 유저의 댓글이 목록에서 조용히 사라져 스레드에 구멍이
 // 뚫린다(replyCount는 users를 안 보므로 개수 불일치까지 생긴다). 방어선은 E2E뿐 — post 전례.
-const AUTHOR = { id: users.id, nickname: users.nickname };
+// projection 조각은 user 소유 — 별칭 테이블도 받으므로 아래 멘션과 같은 조각을 쓴다.
+const AUTHOR = userSummaryColumns(users);
 // 멘션 요약 — left join 미매칭(멘션 없음·멘션 유저 탈퇴로 set null) 시 객체째 null.
-const MENTIONED_USER = { id: mentionedUsers.id, nickname: mentionedUsers.nickname };
+const MENTIONED_USER = userSummaryColumns(mentionedUsers);
 
 // 살아있는 댓글의 content는 앱 불변식상 NOT NULL(NULL ⇔ soft-deleted —
 // comment.table.ts doc)이라, deleted를 배제하는 프로젝션에서만 string으로 좁힌다.

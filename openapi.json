@@ -413,7 +413,7 @@
         },
         "responses": {
           "200": {
-            "description": "내 프로필 부분 수정 (JSON Merge Patch — 현재 nickname만). 응답 = GET /users/me와 같은 조회 표현",
+            "description": "내 프로필 부분 수정 (JSON Merge Patch — nickname · profileImageKey). 필드 부재 = 미변경, null = 해제(profileImageKey만), 값 = 교체. 응답 = GET /users/me와 같은 조회 표현",
             "content": {
               "application/json": {
                 "schema": {
@@ -531,7 +531,9 @@
                     "errorCode": {
                       "type": "string",
                       "enum": [
-                        "INVALID_NICKNAME"
+                        "INVALID_NICKNAME",
+                        "INVALID_PROFILE_IMAGE",
+                        "PROFILE_IMAGE_NOT_UPLOADED"
                       ]
                     },
                     "message": {
@@ -3881,6 +3883,19 @@
             "description": "닉네임 — 전역 유니크",
             "example": "풀멍"
           },
+          "profileImageUrl": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "아바타 읽기 URL — null이면 미설정(기본 이미지는 클라가 렌더한다)",
+            "example": "https://cdn.pulmung.com/user-profile-image/018f2e6a.jpg"
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time",
@@ -3893,6 +3908,7 @@
           "provider",
           "email",
           "nickname",
+          "profileImageUrl",
           "createdAt"
         ],
         "additionalProperties": false
@@ -3906,6 +3922,19 @@
             "type": "string",
             "minLength": 2,
             "maxLength": 20
+          },
+          "profileImageKey": {
+            "description": "POST /files(purpose: user-profile-image)로 발급받은 key — null = 아바타 해제. 교체돼도 기존 S3 객체는 지우지 않는다(월간 GC가 청소)",
+            "example": "user-profile-image/0198c5b2-2f74-7abc-8def-0123456789ab.jpg",
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         }
       },
@@ -3977,11 +4006,25 @@
               "nickname": {
                 "type": "string",
                 "example": "식집사"
+              },
+              "profileImageUrl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "아바타 읽기 URL — null이면 미설정(기본 이미지는 클라가 렌더한다)",
+                "example": "https://cdn.pulmung.com/user-profile-image/018f2e6a.jpg"
               }
             },
             "required": [
               "id",
-              "nickname"
+              "nickname",
+              "profileImageUrl"
             ],
             "additionalProperties": false
           },
@@ -4105,11 +4148,25 @@
                     "nickname": {
                       "type": "string",
                       "example": "식집사"
+                    },
+                    "profileImageUrl": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "uri"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "아바타 읽기 URL — null이면 미설정(기본 이미지는 클라가 렌더한다)",
+                      "example": "https://cdn.pulmung.com/user-profile-image/018f2e6a.jpg"
                     }
                   },
                   "required": [
                     "id",
-                    "nickname"
+                    "nickname",
+                    "profileImageUrl"
                   ],
                   "additionalProperties": false
                 },
@@ -4253,7 +4310,8 @@
             "enum": [
               "plant-image",
               "user-plant-image",
-              "post-image"
+              "post-image",
+              "user-profile-image"
             ]
           },
           "contentType": {
@@ -5183,11 +5241,25 @@
                   "nickname": {
                     "type": "string",
                     "example": "식집사"
+                  },
+                  "profileImageUrl": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "uri"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "아바타 읽기 URL — null이면 미설정(기본 이미지는 클라가 렌더한다)",
+                    "example": "https://cdn.pulmung.com/user-profile-image/018f2e6a.jpg"
                   }
                 },
                 "required": [
                   "id",
-                  "nickname"
+                  "nickname",
+                  "profileImageUrl"
                 ],
                 "additionalProperties": false
               },
@@ -5210,11 +5282,25 @@
                   "nickname": {
                     "type": "string",
                     "example": "식집사"
+                  },
+                  "profileImageUrl": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "uri"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "아바타 읽기 URL — null이면 미설정(기본 이미지는 클라가 렌더한다)",
+                    "example": "https://cdn.pulmung.com/user-profile-image/018f2e6a.jpg"
                   }
                 },
                 "required": [
                   "id",
-                  "nickname"
+                  "nickname",
+                  "profileImageUrl"
                 ],
                 "additionalProperties": false
               },
@@ -5282,11 +5368,25 @@
                             "nickname": {
                               "type": "string",
                               "example": "식집사"
+                            },
+                            "profileImageUrl": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "format": "uri"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "아바타 읽기 URL — null이면 미설정(기본 이미지는 클라가 렌더한다)",
+                              "example": "https://cdn.pulmung.com/user-profile-image/018f2e6a.jpg"
                             }
                           },
                           "required": [
                             "id",
-                            "nickname"
+                            "nickname",
+                            "profileImageUrl"
                           ],
                           "additionalProperties": false
                         },
@@ -5432,11 +5532,25 @@
                         "nickname": {
                           "type": "string",
                           "example": "식집사"
+                        },
+                        "profileImageUrl": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "uri"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "아바타 읽기 URL — null이면 미설정(기본 이미지는 클라가 렌더한다)",
+                          "example": "https://cdn.pulmung.com/user-profile-image/018f2e6a.jpg"
                         }
                       },
                       "required": [
                         "id",
-                        "nickname"
+                        "nickname",
+                        "profileImageUrl"
                       ],
                       "additionalProperties": false
                     },
@@ -5459,11 +5573,25 @@
                         "nickname": {
                           "type": "string",
                           "example": "식집사"
+                        },
+                        "profileImageUrl": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "uri"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "아바타 읽기 URL — null이면 미설정(기본 이미지는 클라가 렌더한다)",
+                          "example": "https://cdn.pulmung.com/user-profile-image/018f2e6a.jpg"
                         }
                       },
                       "required": [
                         "id",
-                        "nickname"
+                        "nickname",
+                        "profileImageUrl"
                       ],
                       "additionalProperties": false
                     },
@@ -5550,11 +5678,25 @@
                     "nickname": {
                       "type": "string",
                       "example": "식집사"
+                    },
+                    "profileImageUrl": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "uri"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "아바타 읽기 URL — null이면 미설정(기본 이미지는 클라가 렌더한다)",
+                      "example": "https://cdn.pulmung.com/user-profile-image/018f2e6a.jpg"
                     }
                   },
                   "required": [
                     "id",
-                    "nickname"
+                    "nickname",
+                    "profileImageUrl"
                   ],
                   "additionalProperties": false
                 },

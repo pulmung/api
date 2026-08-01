@@ -1,10 +1,16 @@
 import { Injectable } from '@nestjs/common';
+import { PublicFileUrlResolver } from '../../file/infrastructure/public-file-url.resolver';
+import {
+  toUserSummaryView,
+  type UserSummaryView,
+} from '../../user/application/user-summary';
 import { UserBlockReader } from '../repository/user-block.reader';
 
 // 차단 목록 읽기 모델 — 응답으로 흐르는 경계 → 명시 타입(§5).
 export type BlockedUserItem = {
   // 차단 해제(DELETE /users/:userId/block)의 대상 id이자 이 목록의 커서.
-  user: { id: string; nickname: string };
+  // inner join이라 non-null — 차단 상대가 탈퇴하면 관계 행도 cascade로 사라진다.
+  user: UserSummaryView;
   createdAt: string;
 };
 
@@ -23,7 +29,10 @@ export type BlockedUserPage = {
  */
 @Injectable()
 export class BlockQueryService {
-  constructor(private readonly reader: UserBlockReader) {}
+  constructor(
+    private readonly reader: UserBlockReader,
+    private readonly urlResolver: PublicFileUrlResolver,
+  ) {}
 
   async findPage(params: {
     blockerId: string;
@@ -37,7 +46,7 @@ export class BlockQueryService {
 
     return {
       blocks: page.map((row) => ({
-        user: row.user,
+        user: toUserSummaryView(row.user, this.urlResolver),
         // z.iso.datetime()은 Date를 거부한다 — 문자열 직렬화는 여기서(post 전례).
         createdAt: row.createdAt.toISOString(),
       })),
